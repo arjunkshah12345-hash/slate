@@ -25,7 +25,7 @@ pnpm test
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) for the landing page, `/studio` for the cut, and `/how` for the tool list.
 
 To test site tools: latest ChatGPT desktop (GPT-5.6 Sol or Terra) in the in-app browser, or Chrome with `chrome://flags/#enable-webmcp-testing`.
 

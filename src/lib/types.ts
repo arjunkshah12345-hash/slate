@@ -45,14 +45,18 @@ export type Action =
   | { type: "seek"; ms: number }
   | { type: "tick"; ms: number }
   | { type: "add_shot"; title: string; durationMs?: number; caption?: string }
+  | { type: "duplicate_shot"; id: string }
+  | { type: "delete_shot"; id: string }
   | { type: "split_shot"; id: string }
   | { type: "trim_shot"; id: string; durationMs: number }
   | { type: "move_shot"; id: string; index: number }
   | { type: "set_caption"; id: string; caption: string }
   | { type: "set_title"; id: string; title: string }
+  | { type: "set_project_title"; title: string }
   | { type: "lock_shot"; id: string }
   | { type: "unlock_shot"; id: string }
   | { type: "set_brief"; brief: string }
+  | { type: "reset" }
   | { type: "request_export" }
   | { type: "confirm_export" }
   | { type: "cancel_export" }

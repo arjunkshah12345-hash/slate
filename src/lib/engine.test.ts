@@ -56,6 +56,16 @@ describe("timeline engine", () => {
     expect(project.shots.length).toBe(before);
   });
 
+  it("refuses to delete a locked shot and duplicates as an open copy", () => {
+    let project = sampleProject();
+    const laugh = project.shots.find((shot) => shot.plate === "laugh")!;
+    expect(() => reduce(project, { type: "delete_shot", id: laugh.id })).toThrow(/locked/i);
+    project = reduce(project, { type: "duplicate_shot", id: laugh.id });
+    const copy = project.shots.find((shot) => shot.id === project.selectedId);
+    expect(copy?.title).toMatch(/copy/i);
+    expect(copy?.locked).toBe(false);
+  });
+
   it("agent caption lands on the same selected shot the human sees", () => {
     let project = sampleProject();
     project = reduce(project, { type: "select", id: "shot_3" });

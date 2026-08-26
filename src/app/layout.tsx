@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Outfit } from "next/font/google";
 import "./globals.css";
+
+const outfit = Outfit({
+  variable: "--font-ui",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
 
 const plex = IBM_Plex_Mono({
   variable: "--font-tc",
@@ -9,17 +15,22 @@ const plex = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Slate — cut it with the agent in the room",
+  title: "Slate. Cut it with the agent in the room.",
   description:
-    "A Shotbase-calm directing studio. WebMCP tools land on the same timeline you can pin, play, and clap.",
+    "A directing studio where ChatGPT and you share one playhead, one pin, and one clap. Built for the WebMCP Challenge.",
+  metadataBase: new URL("https://slate-webmcp.vercel.app"),
+  openGraph: {
+    title: "Slate",
+    description: "Cut it with the agent in the room.",
+    url: "https://slate-webmcp.vercel.app",
+    siteName: "Slate",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${plex.variable} h-full antialiased`}>
-      <body className="min-h-full" style={{ ["--font-ui" as string]: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-        {children}
-      </body>
+    <html lang="en" className={`${outfit.variable} ${plex.variable} h-full antialiased`}>
+      <body className="min-h-full font-[family-name:var(--font-ui)]">{children}</body>
     </html>
   );
 }

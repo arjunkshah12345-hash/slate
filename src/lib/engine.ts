@@ -1,17 +1,22 @@
 import { totalDuration } from "./format";
+import { sampleProject } from "./sample";
 import type { Action, Project, Shot, ToolSpec } from "./types";
 
 const WRITE: Action["type"][] = [
   "add_shot",
+  "duplicate_shot",
+  "delete_shot",
   "split_shot",
   "trim_shot",
   "move_shot",
   "set_caption",
   "set_title",
+  "set_project_title",
   "lock_shot",
   "unlock_shot",
   "set_brief",
   "confirm_export",
+  "reset",
 ];
 
 function snapshot(project: Project) {
@@ -125,6 +130,38 @@ export function reduce(project: Project, action: Action): Project {
         nextSeq,
       };
     }
+    case "duplicate_shot": {
+      const shot = findShot(base, action.id);
+      const { id, nextSeq } = nextId(base);
+      const copy: Shot = {
+        ...shot,
+        id,
+        slate: `${shot.slate.split("-")[0]}-C`,
+        title: `${shot.title} copy`,
+        locked: false,
+      };
+      const index = base.shots.findIndex((item) => item.id === shot.id);
+      const shots = [...base.shots];
+      shots.splice(index + 1, 0, copy);
+      return { ...base, shots, selectedId: id, nextSeq };
+    }
+    case "delete_shot": {
+      const shot = findShot(base, action.id);
+      assertUnlocked(shot);
+      if (base.shots.length <= 1) throw new Error("The cut needs at least one shot.");
+      const shots = base.shots.filter((item) => item.id !== shot.id);
+      const selectedId = base.selectedId === shot.id ? shots[Math.max(0, shots.length - 1)].id : base.selectedId;
+      return {
+        ...base,
+        shots,
+        selectedId,
+        playheadMs: clampPlayhead({ ...base, shots }, base.playheadMs),
+      };
+    }
+    case "set_project_title":
+      return { ...base, title: action.title.trim().slice(0, 48) || base.title };
+    case "reset":
+      return { ...sampleProject(), history: base.history, future: [] };
     case "split_shot": {
       const shot = findShot(base, action.id);
       assertUnlocked(shot);
@@ -302,6 +339,23 @@ export function toolsFor(project: Project): ToolSpec[] {
       annotations: { readOnlyHint: false },
     },
     {
+      name: "set_project_title",
+      description: "Rename the cut. The human sees the new title immediately.",
+      inputSchema: {
+        type: "object",
+        properties: { title: { type: "string" } },
+        required: ["title"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "reset_cut",
+      description: "Restore the sample Northwind cut. Does not confirm export.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false },
+    },
+    {
       name: "play",
       description: "Play the cut from the current playhead. The human watches the same picture.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -404,7 +458,22 @@ export function toolsFor(project: Project): ToolSpec[] {
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: false },
       },
+      {
+        name: "delete_shot",
+        description: `Delete the selected shot. Fails if locked or if it is the last shot.`,
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: false },
+      },
     );
+  }
+
+  if (selected) {
+    tools.push({
+      name: "duplicate_shot",
+      description: `Duplicate the selected shot as a new unlocked copy.`,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false },
+    });
   }
 
   if (selected?.locked) {
@@ -493,6 +562,20 @@ export function applyTool(
         durationMs: input.durationMs != null ? Number(input.durationMs) : undefined,
       });
       result = { id: next.selectedId };
+      break;
+    case "duplicate_shot":
+      next = reduce(project, { type: "duplicate_shot", id: selected!.id });
+      result = { id: next.selectedId };
+      break;
+    case "delete_shot":
+      next = reduce(project, { type: "delete_shot", id: selected!.id });
+      result = { selectedId: next.selectedId };
+      break;
+    case "set_project_title":
+      next = reduce(project, { type: "set_project_title", title: String(input.title ?? "") });
+      break;
+    case "reset_cut":
+      next = reduce(project, { type: "reset" });
       break;
     case "play":
       next = reduce(project, { type: "play" });

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyTool, reduce, selectedShot, shotAtTime, toolsFor } from "@/lib/engine";
 import { formatClock, formatTimecode, totalDuration } from "@/lib/format";
+import { clearProject, loadProject, saveProject } from "@/lib/persist";
 import { sampleProject } from "@/lib/sample";
 import { getModelContext, syncWebmcp } from "@/lib/webmcp";
 import type { Project, Shot } from "@/lib/types";
 import { Plate } from "./plate";
+import Link from "next/link";
 
 type Filter = "all" | "pinned" | "open";
 
@@ -14,12 +16,24 @@ export function Studio() {
   const [project, setProject] = useState<Project>(sampleProject);
   const projectRef = useRef(project);
   projectRef.current = project;
+  const [hydrated, setHydrated] = useState(false);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [toolNames, setToolNames] = useState<string[]>([]);
   const [desk, setDesk] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const [help, setHelp] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setProject(loadProject());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) saveProject(project);
+  }, [hydrated, project]);
 
   const duration = totalDuration(project.shots);
   const now = shotAtTime(project, project.playheadMs);
@@ -100,9 +114,18 @@ export function Studio() {
         event.preventDefault();
         act({ type: event.shiftKey ? "redo" : "undo" });
       }
+      if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+        event.preventDefault();
+        setHelp((open) => !open);
+      }
+      if (event.key === "Escape") setHelp(false);
       if (event.key === "l" && projectRef.current.selectedId) {
         const shot = selectedShot(projectRef.current);
         if (shot) act({ type: shot.locked ? "unlock_shot" : "lock_shot", id: shot.id });
+      }
+      if (event.key === "n" && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        act({ type: "add_shot", title: "Insert" });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -137,15 +160,25 @@ export function Studio() {
     <div className="flex min-h-[100dvh] flex-col">
       <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--bg)]/92 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#111318] ring-1 ring-white/10">
+          <Link href="/" className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#111318] ring-1 ring-white/10">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
               <rect x="1" y="2.5" width="12" height="9" rx="1.6" stroke="#2f6dff" strokeWidth="1.2" />
               <path d="M5.4 4.8v4.4L9.6 7 5.4 4.8z" fill="#2f6dff" />
             </svg>
-          </span>
+          </Link>
           <div>
-            <p className="text-[15px] font-semibold tracking-[-0.02em]">{project.title}</p>
-            <p className="text-[11px] text-[var(--mute)]">Slate · {project.shots.length} shots</p>
+            <input
+              value={project.title}
+              onChange={(event) => act({ type: "set_project_title", title: event.target.value })}
+              className="w-[12ch] bg-transparent text-[15px] font-semibold tracking-[-0.02em] outline-none"
+              aria-label="Project title"
+            />
+            <p className="text-[11px] text-[var(--mute)]">
+              <Link href="/" className="hover:text-[var(--ink)]">
+                Slate
+              </Link>{" "}
+              · {project.shots.length} shots
+            </p>
           </div>
         </div>
 
@@ -191,6 +224,14 @@ export function Studio() {
         >
           Mark
         </button>
+        <button
+          type="button"
+          onClick={() => setHelp(true)}
+          className="rounded-full bg-[var(--bg-raise)] px-3 py-2 text-[13px] text-[var(--mute)] ring-1 ring-[var(--line)]"
+          aria-label="Shortcuts"
+        >
+          ?
+        </button>
       </header>
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[248px_minmax(0,1fr)_340px]">
@@ -206,6 +247,25 @@ export function Studio() {
           ) : (
             <ShotGroup title={filter === "pinned" ? "Pinned" : "Open"} shots={visible} selectedId={selected?.id} onSelect={selectShot} />
           )}
+          <form
+            className="mx-3 mb-4 flex gap-1.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const title = newTitle.trim() || "Insert";
+              act({ type: "add_shot", title });
+              setNewTitle("");
+            }}
+          >
+            <input
+              value={newTitle}
+              onChange={(event) => setNewTitle(event.target.value)}
+              placeholder="Add a shot"
+              className="min-w-0 flex-1 rounded-full bg-[var(--bg-raise)] px-3 py-1.5 text-[12px] outline-none ring-1 ring-[var(--line)]"
+            />
+            <button type="submit" className="rounded-full bg-[var(--bg-hover)] px-3 py-1.5 text-[12px]">
+              Add
+            </button>
+          </form>
         </aside>
 
         <main className="dots flex min-w-0 flex-col">
@@ -346,7 +406,16 @@ export function Studio() {
             <div className="mt-5 border-t border-black/8 pt-4">
               {selected ? (
                 <>
-                  <p className="text-[17px] font-semibold tracking-[-0.02em]">{selected.title}</p>
+                  {selected.locked ? (
+                    <p className="text-[17px] font-semibold tracking-[-0.02em]">{selected.title}</p>
+                  ) : (
+                    <input
+                      value={selected.title}
+                      onChange={(event) => act({ type: "set_title", id: selected.id, title: event.target.value })}
+                      className="w-full bg-transparent text-[17px] font-semibold tracking-[-0.02em] outline-none"
+                      aria-label="Shot title"
+                    />
+                  )}
                   <p className="mt-1 tc text-[11px] text-[var(--card-mute)]">
                     {selected.slate} · {formatClock(selected.durationMs)}
                   </p>
@@ -378,10 +447,15 @@ export function Studio() {
                     >
                       {selected.locked ? "Unpin" : `Pin ${selected.title}`}
                     </LightBtn>
+                    <LightBtn onClick={() => act({ type: "duplicate_shot", id: selected.id })}>Copy</LightBtn>
                     {!selected.locked ? (
                       <LightBtn onClick={() => act({ type: "split_shot", id: selected.id })}>Split</LightBtn>
                     ) : null}
+                    {!selected.locked && project.shots.length > 1 ? (
+                      <LightBtn onClick={() => act({ type: "delete_shot", id: selected.id })}>Delete</LightBtn>
+                    ) : null}
                     <LightBtn onClick={() => act({ type: "undo" })}>Undo</LightBtn>
+                    <LightBtn onClick={() => act({ type: "redo" })}>Redo</LightBtn>
                   </div>
                   {!selected.locked ? (
                     <div className="mt-4">
@@ -469,6 +543,19 @@ export function Studio() {
               {project.agent.lastResult ? (
                 <p className="mt-2 line-clamp-3 text-[12px] text-[var(--card-mute)]">{project.agent.lastResult}</p>
               ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <LightBtn
+                  onClick={() => {
+                    clearProject();
+                    act({ type: "reset" });
+                  }}
+                >
+                  Reset cut
+                </LightBtn>
+                {project.lastCut ? (
+                  <LightBtn onClick={() => downloadEdl(project.lastCut!)}>Download EDL</LightBtn>
+                ) : null}
+              </div>
             </div>
           </div>
         </aside>
@@ -495,13 +582,51 @@ export function Studio() {
         </div>
       ) : null}
 
+      {project.lastCut ? (
+        <pre className="mx-4 mb-3 overflow-auto rounded-2xl bg-[var(--bg-raise)] p-4 tc text-[11px] leading-5 text-[var(--mute)] ring-1 ring-[var(--line)]">
+          {project.lastCut.edl}
+        </pre>
+      ) : null}
+
+      {help ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={() => setHelp(false)}>
+          <div
+            className="w-full max-w-sm rounded-[22px] bg-white p-6 text-[var(--card-ink)] shadow-[0_20px_50px_rgba(0,0,0,0.35)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-[17px] font-semibold">Shortcuts</p>
+            <ul className="mt-4 space-y-2 text-[13px] text-[var(--card-mute)]">
+              <li>Space play or pause</li>
+              <li>L pin or unpin</li>
+              <li>N add a shot</li>
+              <li>⌘K search</li>
+              <li>⌘Z undo · ⇧⌘Z redo</li>
+              <li>? this sheet</li>
+            </ul>
+            <button
+              type="button"
+              onClick={() => setHelp(false)}
+              className="mt-5 rounded-full bg-[#f3f5f8] px-3 py-1.5 text-[12px] font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-4 py-3 text-[12px] text-[var(--mute)]">
         <p>
           {project.lastCut
-            ? `Last marked cut · ${formatClock(project.lastCut.durationMs)} · the laugh stayed pinned.`
-            : "WebMCP Challenge · open this page in ChatGPT desktop (GPT-5.6 Sol or Terra)."}
+            ? `Last marked cut · ${formatClock(project.lastCut.durationMs)}`
+            : "Open this page in ChatGPT desktop (GPT-5.6 Sol or Terra)."}
         </p>
-        <p>Space plays · L pins · ⌘Z undoes</p>
+        <p>
+          <Link href="/how" className="hover:text-[var(--ink)]">
+            How
+          </Link>
+          {" · "}
+          Space · L · ?
+        </p>
       </footer>
     </div>
   );
@@ -593,6 +718,16 @@ function HoldPill({
       <span className="hold-val tc">{formatClock(value)}</span>
     </div>
   );
+}
+
+function downloadEdl(cut: { title: string; edl: string }) {
+  const blob = new Blob([cut.edl], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${cut.title.replace(/\s+/g, "-").toLowerCase()}.edl.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function Spark() {

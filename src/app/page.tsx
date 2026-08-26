@@ -1,5 +1,5 @@
-import { Studio } from "@/components/studio";
+import { Landing } from "@/components/landing";
 
 export default function Home() {
-  return <Studio />;
+  return <Landing />;
 }
