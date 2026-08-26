@@ -42,7 +42,7 @@ agents:
   worker: hats
   judge: hats
 
-active_task: T005
+active_task: T006
 
 tasks:
   - id: T001
@@ -103,7 +103,7 @@ tasks:
   - id: T005
     type: worker
     assignee: Worker
-    status: queued
+    status: done
     objective: "Deploy HTTPS and verify site tools in ChatGPT desktop when asked."
     allowed_files:
       - "README.md"
@@ -112,6 +112,23 @@ tasks:
       - "Missing Vercel/GitHub auth"
     constraints:
       - "Use arjunkshah12345-hash if creating a GitHub repo"
+    receipt:
+      summary: "Public repo + production HTTPS. ChatGPT Sol/Terra site-tools still unproven on this machine."
+      evidence:
+        - "https://slate-webmcp.vercel.app"
+        - "https://github.com/arjunkshah12345-hash/slate"
+      verify: "curl https://slate-webmcp.vercel.app → 200"
+      next: T006
+      full_outcome_complete: false
+
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Prove WebMCP in ChatGPT desktop, record <3min narrated demo, submit Devpost."
+    allowed_files:
+      - "README.md"
+    verify: "Site tools visible in ChatGPT + YouTube demo + Devpost entry"
     receipt: null
 
 full_outcome_complete: false

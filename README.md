@@ -2,6 +2,9 @@
 
 A directing studio for people and agents. WebMCP tools land on the same timeline you can pin, play, and clap.
 
+**Live:** [https://slate-webmcp.vercel.app](https://slate-webmcp.vercel.app)  
+**Repo:** [github.com/arjunkshah12345-hash/slate](https://github.com/arjunkshah12345-hash/slate)
+
 Built for the [WebMCP Challenge](https://webmcp.devpost.com/). Visual language after [Shotbase](https://shotbase.com): dark library, white inspector, blue actions.
 
 ## Why this is a WebMCP product

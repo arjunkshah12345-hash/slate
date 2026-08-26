@@ -20,8 +20,8 @@ A judge-testable WebMCP directing studio: human + agent share one timed storyboa
 | Collaboration | OpenAI Margin | **Parity** — agent identity + last tool on the picture; pins are first-class |
 | Timeline | Frame.io / Descript | **Reference wins** — we have playhead, lock, caption, hold slider; no waveforms or frame-accurate handles |
 | WebMCP | Chrome + OpenAI site-tools docs | **Parity on contract** (7 unit tests). Live ChatGPT browser not yet proven |
-| Visual | Editorial projection booth | **Ours wins vs AI-slop bar.** Distinctive. Not Frame.io-slick |
-| Completeness | Challenge execution | **Local product works.** No public HTTPS URL yet |
+| Visual | Shotbase | **Much closer.** Dark library, white inspector, blue play, search, hold pill |
+| Completeness | Challenge execution | **HTTPS live.** ChatGPT site-tools proof still open |
 
 ## Harness
 
@@ -51,7 +51,7 @@ A judge-testable WebMCP directing studio: human + agent share one timed storyboa
 | Studio UI | done | localhost:3100 + screen.png |
 | Agent presence | done | Codex chip + last tool overlay |
 | Export confirm | done | clap island + tests |
-| Hosted URL | open | not deployed |
+| Hosted URL | done | https://slate-webmcp.vercel.app |
 
 ## UI reference
 
@@ -59,4 +59,4 @@ Shotbase (shotbase.com / @shotbaseapp): dark library, white inspector, blue play
 
 ## Largest remaining gap
 
-Deploy to HTTPS and verify site tools in ChatGPT desktop (Sol/Terra).
+Prove site tools in ChatGPT desktop (Sol/Terra) on the live URL, then record the narrated demo and submit on Devpost.
