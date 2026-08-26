@@ -1,0 +1,117 @@
+# Goal Mode board — machine truth for docs/goals/slate-webmcp/
+version: 1
+
+goal:
+  title: "Ship Slate for the WebMCP Challenge"
+  slug: slate-webmcp
+  kind: existing_plan
+  tranche: "continuous execution until full original outcome is complete"
+  status: active
+  intake:
+    original_request: "/goal build Slate; gauntlet-loop until amazing"
+    interpreted_outcome: "A judge-testable agent-native storyboard studio with WebMCP, locks, visible agent presence, and confirm-to-export."
+    input_shape: existing_plan
+    audience: WebMCP judges and founders pairing with ChatGPT
+    authority: approved
+    proof_type: artifact
+    completion_proof: "Running studio + WebMCP tools + tests + browser verification"
+    likely_misfire: "Pretty landing page or showcase clone"
+    blind_spots_considered:
+      - "No Task subagents; critics emulated"
+      - "Storyboard scope, not a full NLE"
+    existing_plan_facts:
+      - "Slate timed storyboard"
+      - "document.modelContext.registerTool"
+      - "arjunkshah12345-hash if publishing"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+
+agents:
+  scout: hats
+  worker: hats
+  judge: hats
+
+active_task: T005
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    objective: "Map empty repo, set verification commands, rank first build slices."
+    receipt:
+      summary: "Greenfield. Next.js + engine-first."
+      evidence: ["docs/goals/slate-webmcp/notes/T001.md"]
+      verify: "n/a"
+      next: T002
+      full_outcome_complete: false
+
+  - id: T002
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Select first Worker slice."
+    receipt:
+      summary: "Worker: engine + studio + harness."
+      evidence: []
+      verify: "n/a"
+      next: T003
+      full_outcome_complete: false
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    objective: "Build Slate engine, WebMCP, studio UI, tests."
+    allowed_files:
+      - "src/**"
+      - "package.json"
+      - "README.md"
+      - "LICENSE"
+      - "vitest.config.ts"
+    verify: "pnpm test && pnpm build"
+    receipt:
+      summary: "Studio running on :3100. 7 tests. Build green."
+      evidence: ["src/lib/engine.ts", "src/components/studio.tsx", "docs/goals/slate-webmcp/captures/screen.png"]
+      verify: "pnpm test 7/7; pnpm build ok; curl localhost:3100 200"
+      next: T004
+      full_outcome_complete: false
+
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    objective: "Audit artifact vs bar; close largest gap or complete."
+    receipt:
+      summary: "R1 critic: copy/duration/trim. R2: those closed. Product exists. Hosted WebMCP proof still open."
+      evidence: ["GAUNTLET_PROGRESS.md"]
+      verify: "visual + tests"
+      next: T005
+      full_outcome_complete: false
+
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: queued
+    objective: "Deploy HTTPS and verify site tools in ChatGPT desktop when asked."
+    allowed_files:
+      - "README.md"
+    verify: "live URL + ChatGPT site tools list"
+    stop_if:
+      - "Missing Vercel/GitHub auth"
+    constraints:
+      - "Use arjunkshah12345-hash if creating a GitHub repo"
+    receipt: null
+
+full_outcome_complete: false
