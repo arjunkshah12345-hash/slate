@@ -74,6 +74,56 @@ function findShot(project: Project, id: string) {
   return shot;
 }
 
+export function resolveShot(project: Project, input: Record<string, unknown>) {
+  const raw = String(input.id ?? input.slate ?? input.title ?? input.query ?? "").trim();
+  if (!raw) throw new Error("Pass a shot id, slate, or title. Example: shot_5, 05-A, or The laugh.");
+  const lower = raw.toLowerCase();
+  const hit =
+    project.shots.find((shot) => shot.id.toLowerCase() === lower) ??
+    project.shots.find((shot) => shot.slate.toLowerCase() === lower) ??
+    project.shots.find((shot) => shot.title.toLowerCase() === lower) ??
+    project.shots.find((shot) => shot.plate === lower) ??
+    project.shots.find((shot) => shot.title.toLowerCase().includes(lower) || shot.slate.toLowerCase().includes(lower));
+  if (!hit) throw new Error(`No shot matches "${raw}".`);
+  return hit;
+}
+
+export function shotStartMs(project: Project, id: string) {
+  let start = 0;
+  for (const shot of project.shots) {
+    if (shot.id === id) return start;
+    start += shot.durationMs;
+  }
+  return 0;
+}
+
+function cutCard(project: Project) {
+  const selected = selectedShot(project);
+  return {
+    title: project.title,
+    playheadMs: project.playheadMs,
+    durationMs: totalDuration(project.shots),
+    selected: selected
+      ? { id: selected.id, slate: selected.slate, title: selected.title, locked: selected.locked }
+      : null,
+    pinned: project.shots.filter((shot) => shot.locked).map((shot) => ({ id: shot.id, slate: shot.slate, title: shot.title })),
+    available: toolsFor(project).map((tool) => tool.name),
+  };
+}
+
+function stamp(project: Project, extra: Record<string, unknown>, note: string) {
+  return { ...cutCard(project), ...extra, note };
+}
+
+const WRITE_ON_SELECTION = new Set([
+  "trim_shot",
+  "split_shot",
+  "set_caption",
+  "set_title",
+  "move_shot",
+  "delete_shot",
+]);
+
 function assertUnlocked(shot: Shot) {
   if (shot.locked) throw new Error(`${shot.slate} is locked. Unlock it before changing the cut.`);
 }
@@ -302,23 +352,45 @@ export function toolsFor(project: Project): ToolSpec[] {
   const tools: ToolSpec[] = [
     {
       name: "get_project",
-      description: "Read the current cut: title, brief, shots, locks, playhead, and last export.",
+      description:
+        "Read the shared NORTHWIND cut. Returns every shot (id, slate, title, caption, duration, lock), the playhead, pinned shots, and which tools are live right now. 05-A The laugh starts pinned. Call this first.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
     },
     {
       name: "get_selection",
-      description: "Read the selected shot and whether it is locked.",
+      description: "Read the shot the human is looking at, plus whether write tools are live.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
     },
     {
-      name: "select_shot",
-      description: "Select a shot by id so further tools apply to it. The human sees the same selection.",
+      name: "find_shot",
+      description:
+        "Look up a shot by id, slate, title, or a loose query without moving the playhead. Examples: laugh, landfill, 03-A, Product in hand.",
       inputSchema: {
         type: "object",
-        properties: { id: { type: "string", description: "Shot id, e.g. shot_3" } },
-        required: ["id"],
+        properties: {
+          query: { type: "string", description: "Loose text such as laugh or landfill" },
+          id: { type: "string" },
+          slate: { type: "string" },
+          title: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    {
+      name: "select_shot",
+      description:
+        "Select a shot by id, slate, title, or query and jump the playhead so the human sees that still. Examples: shot_3, 03-A, Product in hand, The laugh, landfill.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Shot id such as shot_3, or a title if that is all you have" },
+          slate: { type: "string", description: "Slate such as 03-A" },
+          title: { type: "string", description: "Title such as The laugh" },
+          query: { type: "string", description: "Loose text such as hand or landfill" },
+        },
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false },
@@ -519,7 +591,16 @@ export function applyTool(
 ): { project: Project; result: unknown } {
   const allowed = new Set(toolsFor(project).map((tool) => tool.name));
   if (!allowed.has(name)) {
-    throw new Error(`Tool ${name} is not available in the current cut state.`);
+    const current = selectedShot(project);
+    if (current?.locked && WRITE_ON_SELECTION.has(name)) {
+      throw new Error(
+        `${current.slate} ${current.title} is pinned. Unlock it before ${name}. Live tools: ${[...allowed].join(", ")}.`,
+      );
+    }
+    if (name === "confirm_export") {
+      throw new Error("Export is not armed. Call request_export first, then clap on the page or confirm_export.");
+    }
+    throw new Error(`Tool ${name} is not available. Live tools: ${[...allowed].join(", ")}.`);
   }
 
   const selected = selectedShot(project);
@@ -529,12 +610,11 @@ export function applyTool(
   switch (name) {
     case "get_project":
       result = {
-        title: project.title,
+        ...cutCard(project),
         brief: project.brief,
-        playheadMs: project.playheadMs,
-        durationMs: totalDuration(project.shots),
         exportArmed: project.exportArmed,
         lastCut: project.lastCut,
+        note: "Pinned shots drop write tools. Confirm export is a clap on the page.",
         shots: project.shots.map((shot) => ({
           id: shot.id,
           slate: shot.slate,
@@ -547,13 +627,42 @@ export function applyTool(
       break;
     case "get_selection":
       result = selected
-        ? { id: selected.id, slate: selected.slate, title: selected.title, locked: selected.locked }
-        : { id: null };
+        ? stamp(
+            project,
+            { id: selected.id, slate: selected.slate, title: selected.title, locked: selected.locked, caption: selected.caption },
+            selected.locked ? "Pinned. You can read it. You cannot trim or caption it." : "Open. Write tools apply here.",
+          )
+        : { id: null, note: "Nothing selected." };
       break;
-    case "select_shot":
-      next = reduce(project, { type: "select", id: String(input.id) });
-      result = { selectedId: next.selectedId };
+    case "find_shot": {
+      const shot = resolveShot(project, input);
+      result = stamp(
+        project,
+        {
+          id: shot.id,
+          slate: shot.slate,
+          title: shot.title,
+          locked: shot.locked,
+          caption: shot.caption,
+          durationMs: shot.durationMs,
+        },
+        shot.locked
+          ? `${shot.slate} ${shot.title} is pinned. Select it to unlock, or leave it.`
+          : `${shot.slate} ${shot.title} is open. Select it, then caption or trim.`,
+      );
       break;
+    }
+    case "select_shot": {
+      const shot = resolveShot(project, input);
+      next = reduce(project, { type: "select", id: shot.id });
+      next = reduce(next, { type: "seek", ms: shotStartMs(next, shot.id) + 10 });
+      result = stamp(
+        next,
+        { selectedId: shot.id, slate: shot.slate, title: shot.title, locked: shot.locked },
+        shot.locked ? `On ${shot.title}. Write tools are gone until someone unpins.` : `On ${shot.title}.`,
+      );
+      break;
+    }
     case "add_shot":
       next = reduce(project, {
         type: "add_shot",
@@ -561,68 +670,85 @@ export function applyTool(
         caption: input.caption ? String(input.caption) : undefined,
         durationMs: input.durationMs != null ? Number(input.durationMs) : undefined,
       });
-      result = { id: next.selectedId };
+      next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      result = stamp(next, { id: next.selectedId }, `Added ${selectedShot(next)?.title ?? "a shot"}.`);
       break;
     case "duplicate_shot":
       next = reduce(project, { type: "duplicate_shot", id: selected!.id });
-      result = { id: next.selectedId };
+      next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      result = stamp(next, { id: next.selectedId }, `Copied ${selected?.title}. The copy is unlocked.`);
       break;
     case "delete_shot":
       next = reduce(project, { type: "delete_shot", id: selected!.id });
-      result = { selectedId: next.selectedId };
+      result = stamp(next, { selectedId: next.selectedId }, `Removed ${selected?.title}.`);
       break;
     case "set_project_title":
       next = reduce(project, { type: "set_project_title", title: String(input.title ?? "") });
+      result = stamp(next, {}, `Cut is now ${next.title}.`);
       break;
     case "reset_cut":
       next = reduce(project, { type: "reset" });
+      result = stamp(next, {}, "NORTHWIND is back. The laugh is pinned.");
       break;
     case "play":
       next = reduce(project, { type: "play" });
+      result = stamp(next, {}, "Playing. The human is watching the same picture.");
       break;
     case "pause":
       next = reduce(project, { type: "pause" });
+      result = stamp(next, {}, "Paused.");
       break;
     case "seek":
       next = reduce(project, { type: "seek", ms: Number(input.ms) });
+      result = stamp(next, {}, `Playhead at ${next.playheadMs}ms.`);
       break;
     case "set_brief":
       next = reduce(project, { type: "set_brief", brief: String(input.brief ?? "") });
+      result = stamp(next, {}, "Brief updated.");
       break;
     case "trim_shot":
       next = reduce(project, { type: "trim_shot", id: selected!.id, durationMs: Number(input.durationMs) });
+      result = stamp(next, { durationMs: selectedShot(next)?.durationMs }, `Held ${selected?.title} to ${selectedShot(next)?.durationMs}ms.`);
       break;
     case "split_shot":
       next = reduce(project, { type: "split_shot", id: selected!.id });
+      result = stamp(next, { id: next.selectedId }, `Split ${selected?.title}. You are on the tail.`);
       break;
     case "set_caption":
       next = reduce(project, { type: "set_caption", id: selected!.id, caption: String(input.caption ?? "") });
+      result = stamp(next, { caption: selectedShot(next)?.caption }, `Caption on ${selected?.title}: ${selectedShot(next)?.caption}`);
       break;
     case "set_title":
       next = reduce(project, { type: "set_title", id: selected!.id, title: String(input.title ?? "") });
+      result = stamp(next, { title: selectedShot(next)?.title }, `Renamed to ${selectedShot(next)?.title}.`);
       break;
     case "move_shot":
       next = reduce(project, { type: "move_shot", id: selected!.id, index: Number(input.index) });
+      result = stamp(next, {}, `Moved ${selected?.title}.`);
       break;
     case "lock_shot":
       next = reduce(project, { type: "lock_shot", id: selected!.id });
+      result = stamp(next, {}, `Pinned ${selected?.title}. Write tools dropped.`);
       break;
     case "unlock_shot":
       next = reduce(project, { type: "unlock_shot", id: selected!.id });
+      result = stamp(next, {}, `Unpinned ${selected?.title}. Write tools are back.`);
       break;
     case "request_export":
       next = reduce(project, { type: "request_export" });
-      result = { armed: true, note: "Waiting for confirm_export or the human clap." };
+      result = stamp(next, { armed: true }, "Waiting for confirm_export or the human clap.");
       break;
     case "confirm_export":
       next = reduce(project, { type: "confirm_export" });
-      result = next.lastCut;
+      result = stamp(next, { lastCut: next.lastCut }, `Cut marked. ${next.lastCut?.durationMs}ms.`);
       break;
     case "cancel_export":
       next = reduce(project, { type: "cancel_export" });
+      result = stamp(next, {}, "Clap cancelled.");
       break;
     case "undo":
       next = reduce(project, { type: "undo" });
+      result = stamp(next, {}, "Undid the last edit.");
       break;
     default:
       throw new Error(`Unknown tool ${name}`);
@@ -633,10 +759,17 @@ export function applyTool(
       ? next.selectedId
       : selected?.id ?? next.selectedId;
 
+  const note =
+    typeof result === "object" && result && "note" in result
+      ? String((result as { note: unknown }).note)
+      : typeof result === "string"
+        ? result
+        : JSON.stringify(result);
+
   next = reduce(next, {
     type: "agent",
     tool: name,
-    result: typeof result === "string" ? result : JSON.stringify(result),
+    result: note,
     targetShotId: target,
   });
 

@@ -1,23 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-
-const plex = IBM_Plex_Mono({
-  variable: "--font-tc",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "Slate",
-  description: "Cut it with the agent in the room.",
+  description: "Cut with the agent.",
   metadataBase: new URL("https://slate-webmcp.vercel.app"),
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${plex.variable} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
+      <body className={`${GeistSans.className} min-h-full`}>{children}</body>
     </html>
   );
 }

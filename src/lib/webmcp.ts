@@ -30,9 +30,11 @@ export async function syncWebmcp(
   if (!ctx) return { supported: false, tools: toolsFor(project).map((tool) => tool.name) };
 
   const names: string[] = [];
+  const htmlTools = new Set(["set_brief", "confirm_export"]);
 
   for (const spec of toolsFor(project)) {
     names.push(spec.name);
+    if (htmlTools.has(spec.name)) continue;
     await ctx.registerTool(
       {
         name: spec.name,

@@ -36,7 +36,7 @@ describe("timeline engine", () => {
 
   it("does not export until the clap", () => {
     let project = sampleProject();
-    expect(() => applyTool(project, "confirm_export")).toThrow(/not available/i);
+    expect(() => applyTool(project, "confirm_export")).toThrow(/not armed/i);
     const armed = applyTool(project, "request_export");
     expect(armed.project.exportArmed).toBe(true);
     expect(toolsFor(armed.project).map((tool) => tool.name)).toContain("confirm_export");
@@ -73,5 +73,26 @@ describe("timeline engine", () => {
     expect(next.project.shots.find((shot) => shot.id === "shot_3")?.caption).toBe("Hold the product.");
     expect(next.project.agent.lastTool).toBe("set_caption");
     expect(next.project.agent.targetShotId).toBe("shot_3");
+  });
+
+  it("selects a shot by title and moves the playhead onto that still", () => {
+    const next = applyTool(sampleProject(), "select_shot", { title: "The laugh" });
+    expect(next.project.selectedId).toBe("shot_5");
+    expect(next.project.playheadMs).toBeGreaterThan(10000);
+    expect(toolsFor(next.project).map((tool) => tool.name)).not.toContain("trim_shot");
+    expect(next.project.agent.lastResult).toMatch(/Write tools are gone/i);
+  });
+
+  it("finds a shot by loose query without moving the playhead", () => {
+    const project = sampleProject();
+    const found = applyTool(project, "find_shot", { query: "landfill" });
+    expect((found.result as { id: string }).id).toBe("shot_2");
+    expect(found.project.selectedId).toBe(project.selectedId);
+    expect(found.project.playheadMs).toBe(project.playheadMs);
+  });
+
+  it("explains why a write tool is gone on a pinned shot", () => {
+    const onLaugh = applyTool(sampleProject(), "select_shot", { query: "laugh" });
+    expect(() => applyTool(onLaugh.project, "trim_shot", { durationMs: 800 })).toThrow(/pinned/i);
   });
 });

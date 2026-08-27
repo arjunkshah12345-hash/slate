@@ -1,24 +1,29 @@
+"use client";
+
 import Link from "next/link";
+import { motion, useReducedMotion } from "motion/react";
 
 export function SiteNav({ active }: { active?: "home" | "studio" | "how" }) {
+  const reduce = useReducedMotion();
+
   return (
-    <header className="absolute inset-x-0 top-0 z-20">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5">
-        <Link href="/" className="text-[15px] font-medium tracking-[-0.02em]">
+    <header className="fixed inset-x-0 top-0 z-20 flex justify-center pt-6">
+      <motion.nav
+        className="island text-[13px] text-[var(--mute)]"
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <Link href="/" className="font-medium text-[var(--ink)]">
           Slate
         </Link>
-        <nav className="flex items-center gap-1 text-[13px] text-[var(--mute)]">
-          <Link href="/" className={`rounded-full px-3 py-1.5 ${active === "home" ? "text-[var(--ink)]" : ""}`}>
-            Home
-          </Link>
-          <Link href="/how" className={`rounded-full px-3 py-1.5 ${active === "how" ? "text-[var(--ink)]" : ""}`}>
-            How
-          </Link>
-          <Link href="/studio" className={`rounded-full px-3 py-1.5 ${active === "studio" ? "text-[var(--ink)]" : ""}`}>
-            Studio
-          </Link>
-        </nav>
-      </div>
+        <Link href="/how" className={active === "how" ? "text-[var(--ink)]" : ""}>
+          How
+        </Link>
+        <Link href="/studio" className={active === "studio" ? "text-[var(--ink)]" : ""}>
+          Studio
+        </Link>
+      </motion.nav>
     </header>
   );
 }

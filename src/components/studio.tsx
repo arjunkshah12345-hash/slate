@@ -22,7 +22,8 @@ export function Studio() {
   const [desk, setDesk] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(true);
+  const [sheet, setSheet] = useState(true);
+  const [deskOpen, setDeskOpen] = useState(true);
   const [help, setHelp] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -83,17 +84,28 @@ export function Studio() {
         .reduce((sum, item) => sum + item.durationMs, 0);
       act({ type: "select", id: shot.id });
       act({ type: "seek", ms: start + 10 });
-      setOpen(true);
+      setSheet(true);
     },
     [act, project.shots],
   );
 
+  const followPlayhead = useCallback((current: Project) => {
+    const at = shotAtTime(current, current.playheadMs);
+    if (at && at.shot.id !== current.selectedId) {
+      return reduce(current, { type: "select", id: at.shot.id });
+    }
+    return current;
+  }, []);
+
   useEffect(() => {
     const id = window.setInterval(() => {
-      setProject((current) => (current.playing ? reduce(current, { type: "tick", ms: 80 }) : current));
+      setProject((current) => {
+        if (!current.playing) return current;
+        return followPlayhead(reduce(current, { type: "tick", ms: 80 }));
+      });
     }, 80);
     return () => window.clearInterval(id);
-  }, []);
+  }, [followPlayhead]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -118,7 +130,7 @@ export function Studio() {
       }
       if (event.key === "Escape") {
         setHelp(false);
-        setOpen(false);
+        setSheet(false);
       }
       if (event.key === "l" && projectRef.current.selectedId) {
         const shot = selectedShot(projectRef.current);
@@ -156,371 +168,338 @@ export function Studio() {
   }, []);
 
   const playheadPct = duration ? (project.playheadMs / duration) * 100 : 0;
+  const stage = now?.shot ?? selected;
 
   return (
-    <div className="dots min-h-[100dvh]">
-      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3">
-        <Link href="/" className="text-[15px] font-medium tracking-[-0.02em]">
-          {project.title}
-        </Link>
-        <label className="relative mx-auto w-full max-w-md">
-          <span className="sr-only">Search</span>
+    <div className="flex min-h-[100dvh] flex-col">
+      <header className="absolute inset-x-0 top-0 z-20 flex justify-center px-4 pt-6">
+        <nav className="island max-w-full pr-2 text-[13px] text-[var(--mute)]">
+          <Link href="/" className="font-medium text-[var(--ink)]">
+            Slate
+          </Link>
           <input
-            ref={searchRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            className="w-full rounded-full bg-black/30 px-4 py-2 text-[13px] outline-none ring-1 ring-white/10 placeholder:text-[var(--mute)]"
+            value={project.title}
+            onChange={(event) => act({ type: "set_project_title", title: event.target.value })}
+            className="hidden w-28 bg-transparent text-[var(--ink)] outline-none sm:block"
           />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--mute)]">
-            ⌘K
-          </kbd>
-        </label>
-        <div className="flex rounded-full bg-black/25 p-1 ring-1 ring-white/8">
-          {(["all", "pinned", "open"] as Filter[]).map((key) => (
-            <button key={key} type="button" className="pill" data-on={filter === key} onClick={() => setFilter(key)}>
-              {key === "all" ? "All" : key === "pinned" ? "Pinned" : "Open"}
-            </button>
-          ))}
-        </div>
-        <p className="tc text-[12px] text-[var(--mute)]">
-          {formatTimecode(project.playheadMs)} / {formatClock(duration)}
-        </p>
-        <span className="text-[12px] text-[var(--mute)]">
-          {supported ? "Codex live" : "Codex offline"}
-          {project.agent.lastTool ? ` · ${project.agent.lastTool}` : ""}
-        </span>
-        <button
-          type="button"
-          onClick={() => act({ type: project.playing ? "pause" : "play" })}
-          className="rounded-full bg-[var(--blue)] px-4 py-2 text-[13px] font-medium text-white"
-        >
-          {project.playing ? "Pause" : "Play"}
-        </button>
-        <button
-          type="button"
-          onClick={() => act({ type: "request_export" })}
-          className="rounded-full bg-black/30 px-4 py-2 text-[13px] ring-1 ring-white/10"
-        >
-          Mark
-        </button>
-      </header>
-
-      <div className="mx-auto grid max-w-[1400px] gap-3 px-4 pb-8 lg:grid-cols-[168px_minmax(0,1fr)]">
-        <aside className="pt-2 text-[13px]">
-          <p className="px-2 pb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--mute)]">Library</p>
-          <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left" onClick={() => setFilter("all")}>
-            All shots
-          </button>
-          <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[var(--mute)]" onClick={() => setFilter("pinned")}>
-            Pinned
-          </button>
-          <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[var(--mute)]" onClick={() => setFilter("open")}>
-            Open
-          </button>
+          <label className="relative hidden md:block">
+            <span className="sr-only">Search</span>
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search"
+              className="w-32 bg-transparent outline-none placeholder:text-[var(--mute)]"
+            />
+          </label>
+          <span className="tc hidden sm:inline">{formatTimecode(project.playheadMs)}</span>
+          <span className="hidden lg:inline">
+            {project.agent.lastTool ? `Codex · ${project.agent.lastTool}` : supported ? "Live" : "Offline"}
+          </span>
           <button
             type="button"
-            className="mt-4 block w-full rounded-lg px-2 py-1.5 text-left text-[var(--mute)]"
-            onClick={() => act({ type: "add_shot", title: "Insert" })}
+            onClick={() => act({ type: project.playing ? "pause" : "play" })}
+            className="rounded-full bg-[var(--white)] px-3.5 py-1.5 font-medium text-black"
           >
-            New shot
+            {project.playing ? "Pause" : "Play"}
           </button>
-        </aside>
+          <button type="button" onClick={() => act({ type: "request_export" })} className="pr-2">
+            Mark
+          </button>
+        </nav>
+      </header>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          {visible.map((shot) => (
-            <button
-              key={shot.id}
-              type="button"
-              onClick={() => selectShot(shot)}
-              className="group text-left"
-            >
-              <div className={`overflow-hidden rounded-[18px] ${selected?.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""}`}>
-                <div className="relative aspect-[16/10]">
-                  <Plate shot={shot} playing={false} compact />
-                  {shot.locked ? (
-                    <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-[#1f7a4a]">
-                      Pin
-                    </span>
-                  ) : null}
-                </div>
+      <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-stretch gap-6 px-4 pb-4 pt-24 md:px-8 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="still relative aspect-video">
+            {stage ? <Plate shot={stage} playing={project.playing} /> : null}
+            {project.agent.lastTool ? (
+              <div className="absolute left-4 top-4 max-w-[28ch] text-[12px] leading-4 text-white/80">
+                <p>Codex · {project.agent.lastTool}</p>
+                {project.agent.lastResult ? <p className="mt-1 text-white/60">{project.agent.lastResult}</p> : null}
               </div>
-              <p className="mt-2 truncate text-[13px] font-medium">{shot.title}</p>
-              <p className="tc text-[11px] text-[var(--mute)]">
-                {shot.slate} · {formatClock(shot.durationMs)}
+            ) : null}
+          </div>
+        </div>
+
+        {sheet && selected ? (
+          <aside className="sheet w-full shrink-0 p-7 lg:w-[300px]">
+            {selected.locked ? (
+              <p className="text-[20px] font-medium tracking-[-0.03em]">{selected.title}</p>
+            ) : (
+              <input
+                value={selected.title}
+                onChange={(event) => act({ type: "set_title", id: selected.id, title: event.target.value })}
+                className="w-full bg-transparent text-[20px] font-medium tracking-[-0.03em] outline-none"
+              />
+            )}
+            <p className="mt-1 tc text-[11px] text-[var(--card-mute)]">{selected.slate}</p>
+
+            {selected.locked ? (
+              <p className="mt-5 text-[14px] leading-6 text-[var(--card-mute)]">
+                {selected.caption || "Pinned. Codex can read this, not cut it."}
               </p>
+            ) : (
+              <input
+                value={selected.caption}
+                onChange={(event) => act({ type: "set_caption", id: selected.id, caption: event.target.value })}
+                placeholder="Caption"
+                className="mt-5 w-full bg-transparent text-[14px] leading-6 outline-none placeholder:text-[var(--card-mute)]"
+              />
+            )}
+
+            <form
+              className="mt-8"
+              toolname="set_brief"
+              tooldescription="Update the directing brief the human and agent share."
+              toolautosubmit=""
+              onSubmit={(event) => {
+                event.preventDefault();
+                const brief = String(new FormData(event.currentTarget).get("brief") ?? "");
+                act({ type: "set_brief", brief });
+                const native = event.nativeEvent as SubmitEvent & {
+                  respondWith?: (value: Promise<unknown>) => void;
+                };
+                native.respondWith?.(Promise.resolve({ ok: true, brief }));
+              }}
+            >
+              <p className="text-[11px] text-[var(--card-mute)]">Notes</p>
+              <textarea
+                name="brief"
+                value={project.brief}
+                onChange={(event) => act({ type: "set_brief", brief: event.target.value })}
+                rows={3}
+                toolparamdescription="Shared notes for the cut. Keep the laugh."
+                className="mt-2 w-full resize-none bg-transparent text-[13px] leading-6 text-[var(--card-mute)] outline-none"
+              />
+            </form>
+
+              <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-[var(--card-mute)]">
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => act({ type: selected.locked ? "unlock_shot" : "lock_shot", id: selected.id })}
+              >
+                {selected.locked ? "Unpin" : "Pin"}
+              </button>
+              <button type="button" className="quiet" onClick={() => act({ type: "duplicate_shot", id: selected.id })}>
+                Copy
+              </button>
+              {!selected.locked ? (
+                <button type="button" className="quiet" onClick={() => act({ type: "split_shot", id: selected.id })}>
+                  Split
+                </button>
+              ) : null}
+              {!selected.locked && project.shots.length > 1 ? (
+                <button type="button" className="quiet" onClick={() => act({ type: "delete_shot", id: selected.id })}>
+                  Delete
+                </button>
+              ) : null}
+              <button type="button" className="quiet" onClick={() => act({ type: "undo" })}>
+                Undo
+              </button>
+            </div>
+
+            {!selected.locked ? (
+              <div className="mt-6">
+                <HoldPill
+                  value={selected.durationMs}
+                  min={600}
+                  max={8000}
+                  onChange={(durationMs) => act({ type: "trim_shot", id: selected.id, durationMs })}
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-8 border-t border-black/6 pt-5">
+              <button type="button" className="quiet text-[12px]" onClick={() => setDeskOpen((value) => !value)}>
+                {supported ? "WebMCP" : "Desk"} · {toolNames.length || available.length}
+              </button>
+              {deskOpen ? (
+                <>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[13px]">
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        runTools([
+                          ["select_shot", { query: "hand" }],
+                          ["set_caption", { caption: "Hold. Then turn." }],
+                        ])
+                      }
+                    >
+                      Caption hand
+                    </button>
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        runTools([
+                          ["select_shot", { query: "landfill" }],
+                          ["trim_shot", { durationMs: 1800 }],
+                        ])
+                      }
+                    >
+                      Shorten landfill
+                    </button>
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        runTools([
+                          ["select_shot", { query: "laugh" }],
+                          ["trim_shot", { durationMs: 800 }],
+                        ])
+                      }
+                    >
+                      Try laugh
+                    </button>
+                  </div>
+                  <form
+                    className="mt-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const [name, ...rest] = desk.trim().split(/\s+/);
+                      if (!name) return;
+                      const raw = rest.join(" ");
+                      let input: Record<string, unknown> = {};
+                      if (raw) {
+                        try {
+                          input = JSON.parse(raw);
+                        } catch {
+                          input = { caption: raw, title: raw, brief: raw };
+                        }
+                      }
+                      runTool(name, input);
+                      setDesk("");
+                    }}
+                  >
+                    <input
+                      value={desk}
+                      onChange={(event) => setDesk(event.target.value)}
+                      placeholder='set_caption {"caption":"Keep the laugh."}'
+                      className="w-full bg-transparent text-[12px] outline-none placeholder:text-[var(--card-mute)]"
+                    />
+                  </form>
+                  {project.agent.lastResult ? (
+                    <p className="mt-2 line-clamp-3 text-[12px] text-[var(--card-mute)]">{project.agent.lastResult}</p>
+                  ) : null}
+                </>
+              ) : null}
+              <div className="mt-4 flex gap-4 text-[13px]">
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => {
+                    clearProject();
+                    act({ type: "reset" });
+                  }}
+                >
+                  Reset
+                </button>
+                {project.lastCut ? (
+                  <button type="button" className="quiet" onClick={() => downloadEdl(project.lastCut!)}>
+                    EDL
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </aside>
+        ) : null}
+      </div>
+
+      <div className="px-4 pb-6 md:px-8">
+        <div className="mx-auto flex max-w-[1100px] items-center justify-between pb-2 text-[12px] text-[var(--mute)]">
+          <div className="flex gap-3">
+            {(["all", "pinned", "open"] as Filter[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={filter === key ? "text-[var(--ink)]" : ""}
+                onClick={() => setFilter(key)}
+              >
+                {key === "all" ? "All" : key === "pinned" ? "Pinned" : "Open"}
+              </button>
+            ))}
+            <button type="button" onClick={() => act({ type: "add_shot", title: "Insert" })}>
+              New
             </button>
-          ))}
+          </div>
+          <p className="tc">
+            {formatClock(project.playheadMs)} / {formatClock(duration)}
+          </p>
+        </div>
+        <div
+          className="relative mx-auto max-w-[1100px]"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / Math.max(1, rect.width);
+            setProject((current) => followPlayhead(reduce(current, { type: "seek", ms: x * duration })));
+          }}
+        >
+          <div className="flex h-[72px] gap-1.5">
+            {project.shots.map((shot) => {
+              const hidden = !visible.some((item) => item.id === shot.id);
+              return (
+                <button
+                  key={shot.id}
+                  type="button"
+                  style={{ width: `${(shot.durationMs / duration) * 100}%` }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    selectShot(shot);
+                  }}
+                  className={`relative min-w-10 overflow-hidden rounded-xl ${
+                    selected?.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""
+                  } ${hidden ? "opacity-25" : ""}`}
+                >
+                  <Plate shot={shot} playing={false} compact />
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="pointer-events-none absolute top-0 bottom-0 w-px bg-[var(--blue)]"
+            style={{ left: `${playheadPct}%` }}
+          />
         </div>
       </div>
 
-      {open && selected ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/55 p-4 md:p-8" onClick={() => setOpen(false)}>
-          <div
-            className="grid max-h-[92dvh] w-full max-w-5xl overflow-auto rounded-[28px] bg-[var(--card)] text-[var(--card-ink)] shadow-[0_30px_80px_rgba(0,0,0,0.45)] md:grid-cols-[1.3fr_0.9fr]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="p-4 md:p-5">
-              <div className="overflow-hidden rounded-2xl">
-                <div className="relative aspect-video">
-                  {now ? <Plate shot={now.shot} playing={project.playing} compact /> : <Plate shot={selected} playing={false} compact />}
-                  {project.agent.lastTool ? (
-                    <div className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[12px] shadow-sm">
-                      Codex · {project.agent.lastTool}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="mt-3 flex h-12 gap-1">
-                {project.shots.map((shot) => (
-                  <button
-                    key={shot.id}
-                    type="button"
-                    onClick={() => selectShot(shot)}
-                    className={`relative min-w-0 flex-1 overflow-hidden rounded-md ${selected.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""}`}
-                  >
-                    <Plate shot={shot} playing={false} compact />
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 flex items-end justify-between gap-3 px-1">
-                <div>
-                  {selected.locked ? (
-                    <p className="text-[18px] font-semibold tracking-[-0.02em]">{selected.title}</p>
-                  ) : (
-                    <input
-                      value={selected.title}
-                      onChange={(event) => act({ type: "set_title", id: selected.id, title: event.target.value })}
-                      className="w-full bg-transparent text-[18px] font-semibold tracking-[-0.02em] outline-none"
-                    />
-                  )}
-                  <p className="mt-1 text-[13px] text-[var(--card-mute)]">
-                    {selected.caption || "No caption yet."}
-                  </p>
-                </div>
-                <p className="tc text-[11px] text-[var(--card-mute)]">{selected.slate}</p>
-              </div>
-            </div>
-
-            <div className="border-t border-black/6 p-5 md:border-l md:border-t-0">
-              <p className="flex items-center gap-2 text-[12px] font-medium text-[var(--blue)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--blue)]" />
-                Summary
-              </p>
-              <p className="mt-2 text-[13px] leading-5 text-[var(--card-mute)]">
-                Shared cut. Codex can write on open shots. Pins stay until you unpin them.
-              </p>
-              <p className="mt-5 text-[12px] font-medium">Notes</p>
-              <textarea
-                value={project.brief}
-                onChange={(event) => act({ type: "set_brief", brief: event.target.value })}
-                rows={4}
-                className="mt-2 w-full resize-none rounded-xl bg-[#f1f2f5] p-3 text-[13px] leading-5 outline-none"
-              />
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                <Tag>Launch</Tag>
-                <Tag>WebMCP</Tag>
-                {selected.locked ? <Tag tone="pin">Pinned</Tag> : <Tag>Open</Tag>}
-              </div>
-
-              {!selected.locked ? (
-                <input
-                  value={selected.caption}
-                  onChange={(event) => act({ type: "set_caption", id: selected.id, caption: event.target.value })}
-                  placeholder="Caption"
-                  className="mt-4 w-full rounded-xl bg-[#f1f2f5] px-3 py-2 text-[13px] outline-none"
-                />
-              ) : (
-                <p className="mt-4 text-[13px] text-[var(--card-mute)]">Pinned. Codex can read this, not cut it.</p>
-              )}
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Ghost onClick={() => act({ type: selected.locked ? "unlock_shot" : "lock_shot", id: selected.id })}>
-                  {selected.locked ? "Unpin" : "Pin"}
-                </Ghost>
-                <Ghost onClick={() => act({ type: "duplicate_shot", id: selected.id })}>Copy</Ghost>
-                {!selected.locked ? <Ghost onClick={() => act({ type: "split_shot", id: selected.id })}>Split</Ghost> : null}
-                {!selected.locked && project.shots.length > 1 ? (
-                  <Ghost onClick={() => act({ type: "delete_shot", id: selected.id })}>Delete</Ghost>
-                ) : null}
-                <Ghost onClick={() => act({ type: "undo" })}>Undo</Ghost>
-              </div>
-
-              {!selected.locked ? (
-                <div className="mt-4">
-                  <HoldPill
-                    value={selected.durationMs}
-                    min={600}
-                    max={8000}
-                    onChange={(durationMs) => act({ type: "trim_shot", id: selected.id, durationMs })}
-                  />
-                </div>
-              ) : null}
-
-              <div className="mt-6 border-t border-black/6 pt-4">
-                <p className="text-[12px] text-[var(--card-mute)]">
-                  {supported ? "WebMCP live" : "Rehearse"} · {toolNames.length || available.length} tools
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Ghost
-                    onClick={() =>
-                      runTools([
-                        ["select_shot", { id: "shot_3" }],
-                        ["set_caption", { caption: "Hold. Then turn." }],
-                      ])
-                    }
-                  >
-                    Caption hand
-                  </Ghost>
-                  <Ghost
-                    onClick={() =>
-                      runTools([
-                        ["select_shot", { id: "shot_2" }],
-                        ["trim_shot", { durationMs: 1800 }],
-                      ])
-                    }
-                  >
-                    Shorten landfill
-                  </Ghost>
-                  <Ghost
-                    onClick={() =>
-                      runTools([
-                        ["select_shot", { id: "shot_5" }],
-                        ["trim_shot", { durationMs: 800 }],
-                      ])
-                    }
-                  >
-                    Try laugh
-                  </Ghost>
-                </div>
-                <form
-                  className="mt-3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const [name, ...rest] = desk.trim().split(/\s+/);
-                    if (!name) return;
-                    const raw = rest.join(" ");
-                    let input: Record<string, unknown> = {};
-                    if (raw) {
-                      try {
-                        input = JSON.parse(raw);
-                      } catch {
-                        input = { caption: raw, title: raw, brief: raw };
-                      }
-                    }
-                    runTool(name, input);
-                    setDesk("");
-                  }}
-                >
-                  <input
-                    value={desk}
-                    onChange={(event) => setDesk(event.target.value)}
-                    placeholder='set_caption {"caption":"Keep the laugh."}'
-                    className="w-full rounded-full bg-[#f1f2f5] px-3 py-2 text-[12px] outline-none"
-                  />
-                </form>
-                {project.agent.lastResult ? (
-                  <p className="mt-2 line-clamp-3 text-[12px] text-[var(--card-mute)]">{project.agent.lastResult}</p>
-                ) : null}
-                <div className="mt-3 flex gap-2">
-                  <Ghost
-                    onClick={() => {
-                      clearProject();
-                      act({ type: "reset" });
-                    }}
-                  >
-                    Reset
-                  </Ghost>
-                  {project.lastCut ? <Ghost onClick={() => downloadEdl(project.lastCut!)}>EDL</Ghost> : null}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {open ? null : <div className="sticky bottom-0 z-10 px-4 pb-4">
-        <div
-          className="relative mx-auto max-w-[1400px] overflow-hidden rounded-2xl bg-black/40 p-2 ring-1 ring-white/10 backdrop-blur-md"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            const x = (event.clientX - rect.left - 8) / Math.max(1, rect.width - 16);
-            act({ type: "seek", ms: x * duration });
-          }}
-        >
-          <div className="flex h-16 gap-1">
-            {project.shots.map((shot) => (
-              <button
-                key={shot.id}
-                type="button"
-                style={{ width: `${(shot.durationMs / duration) * 100}%` }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  selectShot(shot);
-                }}
-                className={`relative min-w-10 overflow-hidden rounded-lg ${selected?.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""}`}
-              >
-                <Plate shot={shot} playing={false} compact />
-              </button>
-            ))}
-          </div>
-          <div
-            className="pointer-events-none absolute top-1 bottom-1 w-px bg-[var(--blue)]"
-            style={{ left: `calc(8px + (100% - 16px) * ${playheadPct / 100})` }}
-          />
-        </div>
-      </div>}
-
       {project.exportArmed ? (
-        <div className="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
-          <div className="flex w-full max-w-md items-center justify-between rounded-2xl bg-white px-5 py-4 text-[var(--card-ink)] shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-            <div>
-              <p className="text-[12px] text-[var(--card-mute)]">Ready to mark</p>
-              <p className="text-[16px] font-semibold">Commit this cut?</p>
-            </div>
-            <div className="flex gap-2">
-              <Ghost onClick={() => act({ type: "cancel_export" })}>Hold</Ghost>
-              <button
-                type="button"
-                onClick={() => act({ type: "confirm_export" })}
-                className="rounded-full bg-[var(--blue)] px-4 py-2 text-[13px] font-medium text-white"
-              >
-                Clap
-              </button>
-            </div>
-          </div>
+        <div className="fixed inset-x-0 bottom-28 z-30 flex justify-center px-4">
+          <form
+            className="island island-light gap-5 px-2"
+            toolname="confirm_export"
+            tooldescription="Commit the armed cut. A human can also clap on the page. Does not auto-submit."
+            onSubmit={(event) => {
+              event.preventDefault();
+              act({ type: "confirm_export" });
+              const native = event.nativeEvent as SubmitEvent & {
+                respondWith?: (value: Promise<unknown>) => void;
+              };
+              native.respondWith?.(Promise.resolve({ ok: true, clapped: true }));
+            }}
+          >
+            <p className="pl-2 text-[13px]">Commit this cut?</p>
+            <button type="button" className="text-[13px] text-[var(--card-mute)]" onClick={() => act({ type: "cancel_export" })}>
+              Hold
+            </button>
+            <button type="submit" className="rounded-full bg-black px-3.5 py-1.5 text-[13px] font-medium text-white">
+              Clap
+            </button>
+          </form>
         </div>
       ) : null}
 
       {help ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setHelp(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-[var(--card-ink)]" onClick={(event) => event.stopPropagation()}>
-            <p className="font-semibold">Shortcuts</p>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setHelp(false)}>
+          <div className="sheet w-full max-w-sm p-6" onClick={(event) => event.stopPropagation()}>
+            <p className="font-medium">Shortcuts</p>
             <p className="mt-3 text-[13px] text-[var(--card-mute)]">Space play · L pin · N new · Esc close · ⌘Z undo</p>
           </div>
         </div>
       ) : null}
     </div>
-  );
-}
-
-function Tag({ children, tone }: { children: React.ReactNode; tone?: "pin" }) {
-  return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-        tone === "pin" ? "bg-[#e8f6ee] text-[#1f7a4a]" : "bg-[#e8eeff] text-[#2f6dff]"
-      }`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Ghost({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="rounded-full bg-[#f1f2f5] px-3 py-1.5 text-[12px] font-medium">
-      {children}
-    </button>
   );
 }
 
