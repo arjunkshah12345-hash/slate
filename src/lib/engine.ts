@@ -670,12 +670,16 @@ export function applyTool(
         caption: input.caption ? String(input.caption) : undefined,
         durationMs: input.durationMs != null ? Number(input.durationMs) : undefined,
       });
-      next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      if (next.selectedId) {
+        next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      }
       result = stamp(next, { id: next.selectedId }, `Added ${selectedShot(next)?.title ?? "a shot"}.`);
       break;
     case "duplicate_shot":
       next = reduce(project, { type: "duplicate_shot", id: selected!.id });
-      next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      if (next.selectedId) {
+        next = reduce(next, { type: "seek", ms: shotStartMs(next, next.selectedId) + 10 });
+      }
       result = stamp(next, { id: next.selectedId }, `Copied ${selected?.title}. The copy is unlocked.`);
       break;
     case "delete_shot":
