@@ -12,6 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
+      <head>
+        <link rel="preload" as="image" href="/plates/plate-laugh.webp" fetchPriority="high" />
+      </head>
       <body className={`${GeistSans.className} min-h-full`}>{children}</body>
     </html>
   );

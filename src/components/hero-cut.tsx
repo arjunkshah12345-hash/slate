@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sampleProject } from "@/lib/sample";
 import { shotAtTime } from "@/lib/engine";
 import { Plate } from "./plate";
 
 export function HeroCut() {
-  const project = sampleProject();
-  const duration = project.shots.reduce((sum, shot) => sum + shot.durationMs, 0);
+  const project = useMemo(() => sampleProject(), []);
+  const duration = useMemo(() => project.shots.reduce((sum, shot) => sum + shot.durationMs, 0), [project]);
   const [ms, setMs] = useState(11800);
 
   useEffect(() => {
@@ -19,26 +19,24 @@ export function HeroCut() {
 
   const now = shotAtTime({ ...project, playheadMs: ms }, ms);
   const pct = duration ? (ms / duration) * 100 : 0;
+  const shot = now?.shot;
 
   return (
     <div>
-      <div className="still aspect-video">
-        {now ? <Plate shot={now.shot} playing compact /> : null}
+      <div className="still still-lift aspect-video">
+        {shot ? <Plate key={shot.id} shot={shot} playing compact priority={shot.plate === "laugh"} /> : null}
       </div>
       <div className="relative mt-3 flex h-11 gap-1">
-        {project.shots.map((shot) => (
+        {project.shots.map((item) => (
           <div
-            key={shot.id}
+            key={item.id}
             className="relative min-w-0 overflow-hidden rounded-md"
-            style={{ width: `${(shot.durationMs / duration) * 100}%` }}
+            style={{ width: `${(item.durationMs / duration) * 100}%` }}
           >
-            <Plate shot={shot} playing={false} compact />
+            <Plate shot={item} playing={false} compact thumb />
           </div>
         ))}
-        <div
-          className="pointer-events-none absolute top-0 bottom-0 w-px bg-[var(--blue)]"
-          style={{ left: `${pct}%` }}
-        />
+        <div className="playhead" style={{ left: `${pct}%` }} />
       </div>
     </div>
   );

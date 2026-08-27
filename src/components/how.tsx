@@ -13,9 +13,9 @@ const tools = [
   ["get_project", "Read the shared cut."],
   ["find_shot", "Look up a still. Do not move."],
   ["select_shot", "Land on the same still."],
-  ["set_caption", "Write only if it is open."],
-  ["trim_shot", "Hold a beat. Fails on a pin."],
-  ["lock_shot", "Pins drop write tools."],
+  ["set_caption", "One call. Pass query. Fails on a pin."],
+  ["trim_shot", "Seconds or ms. Fails on a pin."],
+  ["lock_shot", "Pin it. Writes then refuse."],
   ["set_brief", "HTML form. The page is the tool."],
   ["request_export", "Arm the clap."],
   ["confirm_export", "HTML form. No autosubmit."],
@@ -38,8 +38,8 @@ export function How() {
         <ol className="mt-4 list-decimal space-y-3 pl-5 text-[15px] leading-7 text-[var(--mute)]">
           <li>Open https://slate-webmcp.vercel.app/studio in the in-app browser.</li>
           <li>Ask which shot is pinned. It should be the laugh, 05-A.</li>
-          <li>Caption the hand. The picture should change on the page.</li>
-          <li>Try to trim the laugh. Write tools should be gone.</li>
+          <li>Caption the hand. One tool call. The picture should change on the page.</li>
+          <li>Try to trim the laugh. The tool should refuse. The landfill should still trim.</li>
           <li>Mark the cut. Clap on the page. Export waits for a human.</li>
         </ol>
 

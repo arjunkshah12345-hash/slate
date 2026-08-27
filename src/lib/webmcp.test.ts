@@ -35,5 +35,26 @@ describe("webmcp tool surface", () => {
     expect(registered).toContain("get_project");
     expect(registered).not.toContain("set_brief");
     expect(registered).not.toContain("confirm_export");
+    expect(registered).toContain("set_caption");
+    expect(registered).toContain("trim_shot");
+  });
+
+  it("still registers write tools when the laugh is selected", async () => {
+    const registered: string[] = [];
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        modelContext: {
+          registerTool: async (tool: { name: string }) => {
+            registered.push(tool.name);
+          },
+        },
+      },
+    });
+    const onLaugh = { ...sampleProject(), selectedId: "shot_5" };
+    await syncWebmcp(() => onLaugh, () => undefined, new AbortController());
+    expect(registered).toContain("set_caption");
+    expect(registered).toContain("trim_shot");
+    expect(registered).toContain("unlock_shot");
   });
 });

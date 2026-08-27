@@ -37,7 +37,7 @@ Open Slate in ChatGPT’s browser, then:
 
 1. `Read the cut and tell me which shot is pinned.`
 2. `Find the laugh. Do not select it.`
-3. `Caption the product-in-hand shot: "Hold. Then turn."`
+3. `Caption the product-in-hand shot: "Hold. Then turn."` — one tool call, even if you are on the laugh.
 4. `Shorten the landfill. Do not touch the laugh.`
 5. `Ask to mark the cut.` — then clap on the page, or confirm.
 

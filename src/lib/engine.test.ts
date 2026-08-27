@@ -18,18 +18,18 @@ describe("timeline engine", () => {
     const laugh = project.shots.find((shot) => shot.plate === "laugh")!;
     expect(laugh.locked).toBe(true);
     expect(() => reduce(project, { type: "trim_shot", id: laugh.id, durationMs: 1000 })).toThrow(
-      /locked/i,
+      /pinned/i,
     );
   });
 
-  it("hides write tools on a locked selection and exposes unlock", () => {
+  it("keeps write tools on a pin so another shot can still be targeted", () => {
     let project = sampleProject();
     const laugh = project.shots.find((shot) => shot.plate === "laugh")!;
     project = reduce(project, { type: "select", id: laugh.id });
     const names = toolsFor(project).map((tool) => tool.name);
     expect(names).toContain("unlock_shot");
-    expect(names).not.toContain("trim_shot");
-    expect(names).not.toContain("set_caption");
+    expect(names).toContain("trim_shot");
+    expect(names).toContain("set_caption");
     expect(names).not.toContain("confirm_export");
     expect(names).toContain("request_export");
   });
@@ -59,7 +59,7 @@ describe("timeline engine", () => {
   it("refuses to delete a locked shot and duplicates as an open copy", () => {
     let project = sampleProject();
     const laugh = project.shots.find((shot) => shot.plate === "laugh")!;
-    expect(() => reduce(project, { type: "delete_shot", id: laugh.id })).toThrow(/locked/i);
+    expect(() => reduce(project, { type: "delete_shot", id: laugh.id })).toThrow(/pinned/i);
     project = reduce(project, { type: "duplicate_shot", id: laugh.id });
     const copy = project.shots.find((shot) => shot.id === project.selectedId);
     expect(copy?.title).toMatch(/copy/i);
@@ -79,8 +79,8 @@ describe("timeline engine", () => {
     const next = applyTool(sampleProject(), "select_shot", { title: "The laugh" });
     expect(next.project.selectedId).toBe("shot_5");
     expect(next.project.playheadMs).toBeGreaterThan(10000);
-    expect(toolsFor(next.project).map((tool) => tool.name)).not.toContain("trim_shot");
-    expect(next.project.agent.lastResult).toMatch(/Write tools are gone/i);
+    expect(toolsFor(next.project).map((tool) => tool.name)).toContain("trim_shot");
+    expect(next.project.agent.lastResult).toMatch(/refuse/i);
   });
 
   it("finds a shot by loose query without moving the playhead", () => {
@@ -94,5 +94,41 @@ describe("timeline engine", () => {
   it("explains why a write tool is gone on a pinned shot", () => {
     const onLaugh = applyTool(sampleProject(), "select_shot", { query: "laugh" });
     expect(() => applyTool(onLaugh.project, "trim_shot", { durationMs: 800 })).toThrow(/pinned/i);
+  });
+
+  it("captions and trims by name in one call even when the laugh is selected", () => {
+    const onLaugh = applyTool(sampleProject(), "select_shot", { query: "laugh" });
+    const captioned = applyTool(onLaugh.project, "set_caption", {
+      query: "product-in-hand",
+      caption: "Hold. Then turn.",
+    });
+    expect(captioned.project.shots.find((shot) => shot.id === "shot_3")?.caption).toBe("Hold. Then turn.");
+    expect(captioned.project.selectedId).toBe("shot_3");
+    expect(captioned.project.shots.find((shot) => shot.id === "shot_5")?.locked).toBe(true);
+
+    const shortened = applyTool(captioned.project, "trim_shot", { query: "landfill", seconds: 1.8 });
+    expect(shortened.project.shots.find((shot) => shot.id === "shot_2")?.durationMs).toBe(1800);
+    expect(shortened.project.shots.find((shot) => shot.id === "shot_5")?.durationMs).toBe(3000);
+  });
+
+  it("walks the judge path from a cold start", () => {
+    const start = sampleProject();
+    const read = applyTool(start, "get_project");
+    expect((read.result as { pinned: { title: string }[] }).pinned.map((shot) => shot.title)).toContain("The laugh");
+
+    const found = applyTool(start, "find_shot", { query: "laugh" });
+    expect(found.project.selectedId).toBe(start.selectedId);
+
+    const captioned = applyTool(start, "set_caption", { query: "hand", caption: "Hold. Then turn." });
+    expect(captioned.project.shots.find((shot) => shot.id === "shot_3")?.caption).toBe("Hold. Then turn.");
+
+    const shortened = applyTool(captioned.project, "trim_shot", { query: "The landfill", durationMs: 1800 });
+    expect(shortened.project.shots.find((shot) => shot.id === "shot_2")?.durationMs).toBe(1800);
+    expect(() => applyTool(shortened.project, "trim_shot", { query: "laugh", durationMs: 800 })).toThrow(/pinned/i);
+
+    const armed = applyTool(shortened.project, "request_export");
+    const cut = applyTool(armed.project, "confirm_export");
+    expect(cut.project.lastCut?.edl).toMatch(/03-A/);
+    expect(cut.project.lastCut?.edl).toMatch(/05-A/);
   });
 });

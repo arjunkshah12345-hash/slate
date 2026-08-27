@@ -8,6 +8,7 @@ import { clearProject, loadProject, saveProject } from "@/lib/persist";
 import { sampleProject } from "@/lib/sample";
 import { getModelContext, syncWebmcp } from "@/lib/webmcp";
 import type { Project, Shot } from "@/lib/types";
+import { GitHubMark } from "./github-mark";
 import { Plate } from "./plate";
 
 type Filter = "all" | "pinned" | "open";
@@ -172,8 +173,10 @@ export function Studio() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <header className="absolute inset-x-0 top-0 z-20 flex justify-center px-4 pt-6">
-        <nav className="island max-w-full pr-2 text-[13px] text-[var(--mute)]">
+      <header className="absolute inset-x-0 top-0 z-20 px-4 pt-6">
+        <GitHubMark className="absolute right-4 top-6 z-30 hidden md:flex" />
+        <div className="flex justify-center">
+          <nav className="island max-w-full pr-2 text-[13px] text-[var(--mute)]">
           <Link href="/" className="font-medium text-[var(--ink)]">
             Slate
           </Link>
@@ -206,7 +209,8 @@ export function Studio() {
           <button type="button" onClick={() => act({ type: "request_export" })} className="pr-2">
             Mark
           </button>
-        </nav>
+          </nav>
+        </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-stretch gap-6 px-4 pb-4 pt-24 md:px-8 lg:flex-row lg:items-center">
@@ -322,10 +326,7 @@ export function Studio() {
                       type="button"
                       className="quiet"
                       onClick={() =>
-                        runTools([
-                          ["select_shot", { query: "hand" }],
-                          ["set_caption", { caption: "Hold. Then turn." }],
-                        ])
+                        runTools([["set_caption", { query: "hand", caption: "Hold. Then turn." }]])
                       }
                     >
                       Caption hand
@@ -334,10 +335,7 @@ export function Studio() {
                       type="button"
                       className="quiet"
                       onClick={() =>
-                        runTools([
-                          ["select_shot", { query: "landfill" }],
-                          ["trim_shot", { durationMs: 1800 }],
-                        ])
+                        runTools([["trim_shot", { query: "landfill", seconds: 1.8 }]])
                       }
                     >
                       Shorten landfill
@@ -346,10 +344,7 @@ export function Studio() {
                       type="button"
                       className="quiet"
                       onClick={() =>
-                        runTools([
-                          ["select_shot", { query: "laugh" }],
-                          ["trim_shot", { durationMs: 800 }],
-                        ])
+                        runTools([["trim_shot", { query: "laugh", durationMs: 800 }]])
                       }
                     >
                       Try laugh
@@ -453,7 +448,7 @@ export function Studio() {
                     selected?.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""
                   } ${hidden ? "opacity-25" : ""}`}
                 >
-                  <Plate shot={shot} playing={false} compact />
+                  <Plate shot={shot} playing={false} compact thumb />
                 </button>
               );
             })}

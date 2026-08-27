@@ -1,16 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { sampleProject } from "@/lib/sample";
 import { formatClock, totalDuration } from "@/lib/format";
 import type { Shot } from "@/lib/types";
 import { BlurPopUp, BlurPopUpByWord } from "./blur-pop-up";
-import { DitherGradient } from "./dither-kit/gradient";
 import { HeroCut } from "./hero-cut";
 import { Plate } from "./plate";
 import { SiteNav } from "./site-nav";
+
+const DitherGradient = dynamic(
+  () => import("./dither-kit/gradient").then((mod) => ({ default: mod.DitherGradient })),
+  { ssr: false },
+);
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -31,13 +36,23 @@ export function Landing() {
           <p className="mt-5 max-w-[34ch] text-[15px] leading-6 text-[var(--mute)]">
             One still. You pin. Codex writes. Someone has to clap.
           </p>
+          <p className="mt-4 flex items-center justify-center gap-2 text-[12px] text-[var(--mute)]">
+            <span className="live-dot" />
+            <span className="tc">NORTHWIND · 00:20</span>
+          </p>
         </BlurPopUp>
-        <BlurPopUp delay={0.7} className="mt-8">
+        <BlurPopUp delay={0.7} className="mt-8 flex items-center justify-center gap-3">
           <Link
             href="/studio"
-            className="inline-flex rounded-full bg-[var(--white)] px-5 py-2.5 text-[14px] font-medium text-black transition duration-500 ease-[var(--ease)] active:scale-[0.98]"
+            className="inline-flex rounded-full bg-[var(--white)] px-5 py-2.5 text-[14px] font-medium text-black transition duration-500 ease-[var(--ease)] hover:-translate-y-px active:scale-[0.98]"
           >
             Open studio
+          </Link>
+          <Link
+            href="/how"
+            className="inline-flex rounded-full px-4 py-2.5 text-[14px] text-[var(--mute)] transition duration-500 ease-[var(--ease)] hover:text-[var(--ink)]"
+          >
+            How it works
           </Link>
         </BlurPopUp>
         <motion.div
@@ -63,11 +78,23 @@ export function Landing() {
       <Close />
 
       <footer className="mx-auto flex max-w-[820px] items-center justify-between px-6 py-10 text-[13px] text-[var(--mute)]">
-        <span>Slate</span>
-        <div className="flex gap-5">
-          <Link href="/how">How</Link>
-          <Link href="/studio">Studio</Link>
-          <a href="https://github.com/arjunkshah12345-hash/slate" target="_blank" rel="noreferrer">
+        <span className="flex items-center gap-2">
+          Slate
+          <span className="tc text-[11px]">MIT</span>
+        </span>
+        <div className="flex items-center gap-5">
+          <Link href="/how" className="transition-colors hover:text-[var(--ink)]">
+            How
+          </Link>
+          <Link href="/studio" className="transition-colors hover:text-[var(--ink)]">
+            Studio
+          </Link>
+          <a
+            href="https://github.com/arjunkshah12345-hash/slate"
+            target="_blank"
+            rel="noreferrer"
+            className="transition-colors hover:text-[var(--ink)]"
+          >
             GitHub
           </a>
         </div>
@@ -109,19 +136,15 @@ function DriftRail({ shots }: { shots: Shot[] }) {
         <p className="text-[13px] text-[var(--mute)]">NORTHWIND · 00:20</p>
       </Reveal>
       <div className="rail-mask overflow-hidden">
-        <motion.div
-          className="flex w-max gap-2 px-6"
-          animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-          transition={{ duration: 48, ease: "linear", repeat: Infinity }}
-        >
+        <div className={`flex w-max gap-2 px-6 ${reduce ? "" : "rail-track"}`}>
           {row.map((shot, index) => (
-            <div key={`${shot.id}-${index}`} className="still w-[220px] shrink-0 sm:w-[280px]">
+            <div key={`${shot.id}-${index}`} className="still still-lift w-[220px] shrink-0 sm:w-[280px]">
               <div className="aspect-video">
-                <Plate shot={shot} playing={false} compact />
+                <Plate shot={shot} playing={false} compact thumb />
               </div>
             </div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );
@@ -149,20 +172,20 @@ function CutSteps({ shots }: { shots: Shot[] }) {
   ];
 
   return (
-    <section className="mx-auto grid max-w-[1100px] gap-10 px-6 py-28 lg:grid-cols-2 lg:items-start lg:gap-20">
+    <section className="cv mx-auto grid max-w-[1100px] gap-10 px-6 py-28 lg:grid-cols-2 lg:items-start lg:gap-20">
       <div>
         {steps.map((step, index) => (
           <Step key={step.title} onEnter={() => setActive(index)}>
             <p className="text-[clamp(2rem,4vw,3.2rem)] font-medium tracking-[-0.045em]">{step.title}</p>
             <p className="mt-4 max-w-[34ch] text-[16px] leading-7 text-[var(--mute)]">{step.copy}</p>
-            <div className="still mt-8 aspect-video lg:hidden">
-              <Plate shot={step.shot} playing={false} compact />
+            <div className="still still-lift mt-8 aspect-video lg:hidden">
+              <Plate shot={step.shot} playing={false} compact thumb />
             </div>
           </Step>
         ))}
       </div>
       <div className="sticky top-28 hidden lg:block">
-        <div className="still relative aspect-video overflow-hidden">
+        <div className="still still-lift relative aspect-video overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={steps[active].title}
@@ -201,7 +224,7 @@ function Step({ children, onEnter }: { children: ReactNode; onEnter: () => void 
 
 function Lookbook({ shots, duration }: { shots: Shot[]; duration: number }) {
   return (
-    <section className="px-6 py-24">
+    <section className="cv px-6 py-24">
       <Reveal className="mx-auto max-w-[1100px]">
         <p className="text-[13px] text-[var(--mute)]">The cut</p>
         <h2 className="mt-3 text-[clamp(2rem,4vw,3rem)] font-medium tracking-[-0.045em]">
@@ -211,8 +234,8 @@ function Lookbook({ shots, duration }: { shots: Shot[]; duration: number }) {
       <div className="mx-auto mt-12 flex max-w-[1100px] gap-3 overflow-x-auto pb-2">
         {shots.map((shot, index) => (
           <Reveal key={shot.id} delay={index * 0.04} className="w-[200px] shrink-0 sm:w-[240px]">
-            <div className="still aspect-video">
-              <Plate shot={shot} playing={false} compact />
+            <div className="still still-lift aspect-video">
+              <Plate shot={shot} playing={false} compact thumb />
             </div>
             <p className="mt-3 text-[14px]">{shot.title}</p>
             <p className="tc text-[12px] text-[var(--mute)]">
@@ -229,10 +252,10 @@ function Lookbook({ shots, duration }: { shots: Shot[]; duration: number }) {
 
 function LockShot({ shot }: { shot: Shot }) {
   return (
-    <section className="px-6 py-28">
+    <section className="cv px-6 py-28">
       <Reveal className="mx-auto max-w-[880px]">
-        <div className="still aspect-video">
-          <Plate shot={shot} playing compact />
+        <div className="still still-lift aspect-video">
+          <Plate shot={shot} playing />
         </div>
         <h2 className="mt-10 text-[clamp(2rem,4vw,3.2rem)] font-medium tracking-[-0.045em]">
           Keep the laugh.
@@ -256,7 +279,7 @@ function Tools() {
   ];
 
   return (
-    <section className="px-6 py-24">
+    <section className="cv px-6 py-24">
       <Reveal className="mx-auto max-w-[640px]">
         <p className="text-[13px] text-[var(--mute)]">WebMCP</p>
         <h2 className="mt-3 text-[clamp(2rem,4vw,3rem)] font-medium tracking-[-0.045em]">
@@ -265,7 +288,7 @@ function Tools() {
       </Reveal>
       <div className="mx-auto mt-12 max-w-[640px] divide-y divide-white/8">
         {rows.map(([name, copy], index) => (
-          <Reveal key={name} delay={index * 0.05} className="flex items-baseline justify-between gap-6 py-4">
+          <Reveal key={name} delay={index * 0.05} className="tool-row flex items-baseline justify-between gap-6 py-4">
             <p className="tc text-[13px]">{name}</p>
             <p className="text-right text-[14px] text-[var(--mute)]">{copy}</p>
           </Reveal>
@@ -286,10 +309,11 @@ function Close() {
         </p>
         <Link
           href="/studio"
-          className="mt-8 inline-flex rounded-full bg-[var(--white)] px-5 py-2.5 text-[14px] font-medium text-black transition duration-500 ease-[var(--ease)] active:scale-[0.98]"
+          className="mt-8 inline-flex rounded-full bg-[var(--white)] px-5 py-2.5 text-[14px] font-medium text-black transition duration-500 ease-[var(--ease)] hover:-translate-y-px active:scale-[0.98]"
         >
           Open studio
         </Link>
+        <p className="mt-5 tc text-[11px] text-[var(--mute)]">space to play · L to pin · clap to mark</p>
       </Reveal>
     </section>
   );
