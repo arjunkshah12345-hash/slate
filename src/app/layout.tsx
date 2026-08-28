@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { WebmcpBridge } from "@/components/webmcp-bridge";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <link rel="preload" as="image" href="/plates/plate-laugh.webp" fetchPriority="high" />
       </head>
-      <body className={`${GeistSans.className} min-h-full`}>{children}</body>
+      <body className={`${GeistSans.className} min-h-full`}>
+        <WebmcpBridge />
+        {children}
+      </body>
     </html>
   );
 }

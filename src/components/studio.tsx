@@ -6,10 +6,11 @@ import { applyTool, reduce, selectedShot, shotAtTime, toolsFor } from "@/lib/eng
 import { formatClock, formatTimecode, totalDuration } from "@/lib/format";
 import { clearProject, loadProject, saveProject } from "@/lib/persist";
 import { sampleProject } from "@/lib/sample";
-import { getModelContext, syncWebmcp } from "@/lib/webmcp";
+import { waitForModelContext } from "@/lib/webmcp";
 import type { Project, Shot } from "@/lib/types";
 import { GitHubMark } from "./github-mark";
 import { Plate } from "./plate";
+import { PROJECT_EVENT, setLiveProject } from "./webmcp-bridge";
 
 type Filter = "all" | "pinned" | "open";
 
@@ -48,7 +49,6 @@ export function Studio() {
     return `${shot.title} ${shot.slate} ${shot.caption}`.toLowerCase().includes(query.trim().toLowerCase());
   });
 
-  const dispatch = useCallback((next: Project) => setProject(next), []);
   const act = useCallback((action: Parameters<typeof reduce>[1]) => {
     setProject((current) => reduce(current, action));
   }, []);
@@ -147,25 +147,23 @@ export function Studio() {
   }, [act]);
 
   useEffect(() => {
-    const abort = new AbortController();
     let alive = true;
-    syncWebmcp(() => projectRef.current, dispatch, abort)
-      .then((info) => {
-        if (!alive) return;
-        setSupported(info.supported);
-        setToolNames(info.tools);
-      })
-      .catch(() => {
-        if (alive) setSupported(false);
-      });
+    setLiveProject(() => projectRef.current);
+    const onProject = (event: Event) => {
+      const next = (event as CustomEvent<Project>).detail;
+      if (next) setProject(next);
+    };
+    window.addEventListener(PROJECT_EVENT, onProject);
+    void waitForModelContext().then((ctx) => {
+      if (!alive) return;
+      setSupported(Boolean(ctx));
+      setToolNames(toolsFor(projectRef.current).map((tool) => tool.name));
+    });
     return () => {
       alive = false;
-      abort.abort();
+      setLiveProject(null);
+      window.removeEventListener(PROJECT_EVENT, onProject);
     };
-  }, [available.join("|"), dispatch]);
-
-  useEffect(() => {
-    setSupported(Boolean(getModelContext()));
   }, []);
 
   const playheadPct = duration ? (project.playheadMs / duration) * 100 : 0;

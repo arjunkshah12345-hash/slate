@@ -30,7 +30,7 @@ describe("timeline engine", () => {
     expect(names).toContain("unlock_shot");
     expect(names).toContain("trim_shot");
     expect(names).toContain("set_caption");
-    expect(names).not.toContain("confirm_export");
+    expect(names).toContain("confirm_export");
     expect(names).toContain("request_export");
   });
 

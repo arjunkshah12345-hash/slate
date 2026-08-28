@@ -524,19 +524,16 @@ export function toolsFor(project: Project): ToolSpec[] {
     },
   ];
 
-  if (project.history.length) {
-    tools.push({
+  tools.push(
+    {
       name: "undo",
       description: "Undo the last edit to the cut.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: false },
-    });
-  }
+    },
+  );
 
-  const focus = selected ? `${selected.slate} ${selected.title}` : "the selection";
-  const pinHint = selected?.locked
-    ? ` ${focus} is pinned. Pass query to edit a different shot.`
-    : ` Omit query to use ${focus}.`;
+  const pinHint = " Pass query to pick a shot. Pins refuse writes.";
 
   tools.push(
     {
@@ -613,38 +610,32 @@ export function toolsFor(project: Project): ToolSpec[] {
     },
   );
 
-  if (project.shots.some((shot) => shot.locked)) {
-    tools.push({
+  tools.push(
+    {
       name: "unlock_shot",
       description: "Unpin a shot so write tools can change it. Pass query such as laugh, or use the selection.",
       inputSchema: { type: "object", properties: { ...SHOT_REF }, additionalProperties: false },
       annotations: { readOnlyHint: false },
-    });
-  }
-
-  if (project.exportArmed) {
-    tools.push(
-      {
-        name: "confirm_export",
-        description: "Commit the cut. Only available after request_export. The human must also be able to confirm on the clap.",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false },
-        annotations: { readOnlyHint: false },
-      },
-      {
-        name: "cancel_export",
-        description: "Cancel a pending export clap.",
-        inputSchema: { type: "object", properties: {}, additionalProperties: false },
-        annotations: { readOnlyHint: false },
-      },
-    );
-  } else {
-    tools.push({
+    },
+    {
       name: "request_export",
       description: "Arm export. Does not write the cut until confirm_export or the human claps.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: false },
-    });
-  }
+    },
+    {
+      name: "confirm_export",
+      description: "Commit the cut after request_export. Fails if export is not armed. The human can also clap on the page.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false },
+    },
+    {
+      name: "cancel_export",
+      description: "Cancel a pending export clap.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false },
+    },
+  );
 
   return tools;
 }
@@ -843,6 +834,9 @@ export function applyTool(
       result = stamp(next, { armed: true }, "Waiting for confirm_export or the human clap.");
       break;
     case "confirm_export":
+      if (!project.exportArmed) {
+        throw new Error("Export is not armed. Call request_export first, then clap on the page or confirm_export.");
+      }
       next = reduce(project, { type: "confirm_export" });
       result = stamp(next, { lastCut: next.lastCut }, `Cut marked. ${next.lastCut?.durationMs}ms.`);
       break;

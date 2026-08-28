@@ -16,9 +16,9 @@ const tools = [
   ["set_caption", "One call. Pass query. Fails on a pin."],
   ["trim_shot", "Seconds or ms. Fails on a pin."],
   ["lock_shot", "Pin it. Writes then refuse."],
-  ["set_brief", "HTML form. The page is the tool."],
+  ["set_brief", "Shared notes. JavaScript tool."],
   ["request_export", "Arm the clap."],
-  ["confirm_export", "HTML form. No autosubmit."],
+  ["confirm_export", "Commit after arm. Human can clap too."],
 ];
 
 export function How() {
@@ -64,7 +64,7 @@ export function How() {
         </div>
 
         <p className="mt-10 text-[15px] leading-7 text-[var(--mute)]">
-          Timeline tools register in JavaScript. The brief and the clap are HTML forms. Same reducer. No second backend.
+          Every tool registers in JavaScript on the live page. ChatGPT does not read HTML forms. Same reducer. No second backend.
         </p>
 
         <Link
