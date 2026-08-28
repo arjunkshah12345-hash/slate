@@ -35,7 +35,7 @@ To test site tools: latest ChatGPT desktop (GPT-5.6 Sol or Terra) in the in-app 
 
 Open Slate in ChatGPT’s browser, then:
 
-1. `Read the cut and tell me which shot is pinned.`
+1. `Look at the still. What is on screen?`
 2. `Find the laugh. Do not select it.`
 3. `Caption the product-in-hand shot: "Hold. Then turn."` — one tool call, even if you are on the laugh.
 4. `Shorten the landfill. Do not touch the laugh.`

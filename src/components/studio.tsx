@@ -213,14 +213,20 @@ export function Studio() {
 
       <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-stretch gap-6 px-4 pb-4 pt-24 md:px-8 lg:flex-row lg:items-center">
         <div className="min-w-0 flex-1">
-          <div className="still relative aspect-video">
+          <div
+            className={`still relative aspect-video ${
+              project.agent.lastAt && Date.now() - project.agent.lastAt < 6000 ? "agent-live" : ""
+            }`}
+          >
             {stage ? <Plate shot={stage} playing={project.playing} /> : null}
             {project.agent.lastTool ? (
-              <div className="absolute left-4 top-4 max-w-[28ch] text-[12px] leading-4 text-white/80">
+              <div className="agent-chip">
                 <p>Codex · {project.agent.lastTool}</p>
-                {project.agent.lastResult ? <p className="mt-1 text-white/60">{project.agent.lastResult}</p> : null}
+                {project.agent.lastResult ? <p className="mt-1 text-white/55">{project.agent.lastResult}</p> : null}
               </div>
-            ) : null}
+            ) : (
+              <p className="agent-chip agent-chip-idle">Same still. You pin. Codex writes.</p>
+            )}
           </div>
         </div>
 
@@ -444,7 +450,7 @@ export function Studio() {
                   }}
                   className={`relative min-w-10 overflow-hidden rounded-xl ${
                     selected?.id === shot.id ? "ring-2 ring-[var(--blue)]" : ""
-                  } ${hidden ? "opacity-25" : ""}`}
+                  } ${project.agent.targetShotId === shot.id ? "agent-target" : ""} ${hidden ? "opacity-25" : ""}`}
                 >
                   <Plate shot={shot} playing={false} compact thumb />
                 </button>

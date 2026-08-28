@@ -1,4 +1,4 @@
-import { totalDuration } from "./format";
+import { formatClock, formatTimecode, totalDuration } from "./format";
 import { sampleProject } from "./sample";
 import type { Action, Project, Shot, ToolSpec } from "./types";
 
@@ -148,22 +148,44 @@ export function shotStartMs(project: Project, id: string) {
   return 0;
 }
 
+export function seeFrame(project: Project) {
+  const at = shotAtTime(project, project.playheadMs);
+  const shot = at?.shot ?? selectedShot(project);
+  return {
+    onScreen: shot
+      ? {
+          id: shot.id,
+          slate: shot.slate,
+          title: shot.title,
+          caption: shot.caption,
+          locked: shot.locked,
+          hold: formatClock(shot.durationMs),
+        }
+      : null,
+    playhead: formatTimecode(project.playheadMs),
+    playing: project.playing,
+    exportArmed: project.exportArmed,
+    pinned: project.shots.filter((item) => item.locked).map((item) => `${item.slate} ${item.title}`),
+    humanSelected: selectedShot(project) ? `${selectedShot(project)!.slate} ${selectedShot(project)!.title}` : null,
+  };
+}
+
 function cutCard(project: Project) {
   const selected = selectedShot(project);
   return {
     title: project.title,
-    playheadMs: project.playheadMs,
-    durationMs: totalDuration(project.shots),
+    playhead: formatTimecode(project.playheadMs),
+    duration: formatClock(totalDuration(project.shots)),
+    see: seeFrame(project),
     selected: selected
       ? { id: selected.id, slate: selected.slate, title: selected.title, locked: selected.locked }
       : null,
     pinned: project.shots.filter((shot) => shot.locked).map((shot) => ({ id: shot.id, slate: shot.slate, title: shot.title })),
-    available: toolsFor(project).map((tool) => tool.name),
   };
 }
 
 function stamp(project: Project, extra: Record<string, unknown>, note: string) {
-  return { ...cutCard(project), ...extra, note };
+  return { ok: true, note, see: seeFrame(project), ...extra };
 }
 
 const WRITE_ON_SELECTION = new Set([
@@ -413,22 +435,29 @@ export function toolsFor(project: Project): ToolSpec[] {
   const selected = selectedShot(project);
   const tools: ToolSpec[] = [
     {
+      name: "see_still",
+      description:
+        "Look at the still on the page right now. This is the shared picture — not a screenshot. Returns slate, title, caption, pin, playhead, and whether export is armed. Call this before you write.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+    },
+    {
       name: "get_project",
       description:
-        "Read the shared NORTHWIND cut. Returns every shot (id, slate, title, caption, duration, lock), the playhead, pinned shots, and which tools are live right now. 05-A The laugh starts pinned. Call this first.",
+        "Read the shared NORTHWIND cut: every shot, pins, brief, and the still on screen. 05-A The laugh starts pinned. Prefer see_still when you only need the picture.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
     },
     {
       name: "get_selection",
-      description: "Read the shot the human is looking at, plus whether write tools are live.",
+      description: "Read the shot the human has selected. Same live page as see_still.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
     },
     {
       name: "find_shot",
       description:
-        "Look up a shot by id, slate, title, or a loose query without moving the playhead. Examples: laugh, landfill, 03-A, Product in hand.",
+        "Look up a shot by id, slate, title, or a loose query without moving the playhead. The human stays on their still. Examples: laugh, landfill, 03-A, Product in hand.",
       inputSchema: {
         type: "object",
         properties: {
@@ -439,7 +468,7 @@ export function toolsFor(project: Project): ToolSpec[] {
         },
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
     },
     {
       name: "select_shot",
@@ -513,14 +542,14 @@ export function toolsFor(project: Project): ToolSpec[] {
     },
     {
       name: "set_brief",
-      description: "Update the directing brief the human and agent share.",
+      description: "Update the directing brief the human and agent share on this page.",
       inputSchema: {
         type: "object",
         properties: { brief: { type: "string" } },
         required: ["brief"],
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: false },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
     },
   ];
 
@@ -559,14 +588,14 @@ export function toolsFor(project: Project): ToolSpec[] {
     },
     {
       name: "set_caption",
-      description: `Write a burned-in caption. Pass query to pick the shot (hand, landfill).${pinHint} Fails on a pin.`,
+      description: `Write a burned-in caption on the shared still. The human sees it immediately. Pass query to pick the shot (hand, landfill).${pinHint} Fails on a pin.`,
       inputSchema: {
         type: "object",
         properties: { caption: { type: "string" }, ...SHOT_REF },
         required: ["caption"],
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: false },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
     },
     {
       name: "set_title",
@@ -664,13 +693,25 @@ export function applyTool(
   let result: unknown = { ok: true };
 
   switch (name) {
+    case "see_still": {
+      const see = seeFrame(project);
+      result = {
+        ...see,
+        note: see.onScreen
+          ? see.onScreen.locked
+            ? `On screen: ${see.onScreen.slate} ${see.onScreen.title}. Pinned. You can read it, not cut it.`
+            : `On screen: ${see.onScreen.slate} ${see.onScreen.title}. ${see.onScreen.caption || "No caption."}`
+          : "Nothing on screen.",
+      };
+      break;
+    }
     case "get_project":
       result = {
         ...cutCard(project),
         brief: project.brief,
         exportArmed: project.exportArmed,
         lastCut: project.lastCut,
-        note: "Pass query to caption or trim a named shot in one call. Pins refuse writes. Confirm export is a clap on the page.",
+        note: "This is the live page. Call see_still to look at the picture. Pass query to caption or trim. Pins refuse writes. Export is a clap.",
         shots: project.shots.map((shot) => ({
           id: shot.id,
           slate: shot.slate,

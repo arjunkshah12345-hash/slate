@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyTool, reduce, toolsFor } from "./engine";
+import { applyTool, reduce, seeFrame, toolsFor } from "./engine";
 import { sampleProject } from "./sample";
 import { totalDuration } from "./format";
 
@@ -109,6 +109,15 @@ describe("timeline engine", () => {
     const shortened = applyTool(captioned.project, "trim_shot", { query: "landfill", seconds: 1.8 });
     expect(shortened.project.shots.find((shot) => shot.id === "shot_2")?.durationMs).toBe(1800);
     expect(shortened.project.shots.find((shot) => shot.id === "shot_5")?.durationMs).toBe(3000);
+  });
+
+  it("see_still reports the picture on the playhead without moving", () => {
+    const onLaugh = applyTool(sampleProject(), "select_shot", { query: "laugh" });
+    const seen = applyTool(onLaugh.project, "see_still");
+    expect((seen.result as { onScreen: { title: string; locked: boolean } }).onScreen.title).toBe("The laugh");
+    expect((seen.result as { onScreen: { locked: boolean } }).onScreen.locked).toBe(true);
+    expect(seen.project.playheadMs).toBe(onLaugh.project.playheadMs);
+    expect(seeFrame(onLaugh.project).pinned.join(" ")).toMatch(/laugh/i);
   });
 
   it("walks the judge path from a cold start", () => {

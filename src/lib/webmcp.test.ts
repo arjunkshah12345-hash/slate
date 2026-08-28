@@ -7,8 +7,20 @@ describe("webmcp tool surface", () => {
   it("always exposes read tools and the clap tools ChatGPT can actually call", () => {
     const names = toolsFor(sampleProject()).map((tool) => tool.name);
     expect(names).toEqual(
-      expect.arrayContaining(["get_project", "get_selection", "find_shot", "request_export", "confirm_export", "set_brief"]),
+      expect.arrayContaining([
+        "see_still",
+        "get_project",
+        "get_selection",
+        "find_shot",
+        "request_export",
+        "confirm_export",
+        "set_brief",
+      ]),
     );
+    expect(toolsFor(sampleProject()).find((tool) => tool.name === "see_still")?.annotations).toMatchObject({
+      readOnlyHint: true,
+      untrustedContentHint: true,
+    });
     expect(toolsFor(sampleProject()).find((tool) => tool.name === "get_project")?.annotations.readOnlyHint).toBe(
       true,
     );
